@@ -1,432 +1,383 @@
-<!DOCTYPE html>
-<html lang="en">
+/**
+ * FibreGems Field Activity Tracker — Google Apps Script Backend (Code.gs)
+ * 
+ * Deployment Instructions:
+ * 1. Open your Google Sheet
+ * 2. Click Extensions > Apps Script
+ * 3. Replace all code in Code.gs with this file
+ * 4. Click Deploy > New deployment
+ * 5. Select type: "Web app"
+ * 6. Set Description: "FibreGems Tracker Backend v2"
+ * 7. Execute as: "Me"
+ * 8. Who has access: "Anyone"
+ * 9. Click Deploy and copy the Web App URL into APP_SCRIPT_URL in index.html
+ */
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Field Operations & Super Admin Suite</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-</head>
+// Global Configuration
+const FOLDER_NAME = "FibreGems_Uploads";
+const TIMEZONE = "Africa/Johannesburg"; // SAST (UTC+2)
 
-<body class="bg-[#f8f6f0] text-gray-900 font-sans antialiased min-h-screen flex flex-col">
+/**
+ * Handle HTTP GET Requests
+ */
+function doGet(e) {
+  try {
+    const action = e && e.parameter ? e.parameter.action : null;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    <!-- Navigation Header -->
-    <header class="bg-[#0b5345] text-white shadow-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
-            <div class="flex items-center space-x-2">
-                <span
-                    class="bg-emerald-600 text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider">Field
-                    Ops Portal</span>
-                <span id="current-date-display" class="text-sm font-medium opacity-90"></span>
-            </div>
-            <nav class="flex flex-wrap gap-1 bg-[#083e34] p-1 rounded-xl">
-                <button onclick="switchView('agent-checkin')" id="btn-agent-checkin"
-                    class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors bg-white text-[#0b5345]">Agent
-                    Sign-on</button>
-                <button onclick="switchView('leader-console')" id="btn-leader-console"
-                    class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors text-white hover:bg-emerald-700">Leader
-                    Console</button>
-                <button onclick="switchView('super-admin')" id="btn-super-admin"
-                    class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors text-white hover:bg-emerald-700">Super
-                    Admin Dashboard</button>
-            </nav>
-        </div>
-    </header>
+    if (action === "getSuperAdminData" || action === "getPortalData") {
+      return getSuperAdminData(ss);
+    }
 
-    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 relative">
+    return createJsonResponse({
+      status: "success",
+      message: "FibreGems Field Operations API is active."
+    });
+  } catch (err) {
+    return createJsonResponse({
+      status: "error",
+      message: err.toString()
+    });
+  }
+}
 
-        <!-- GLOBAL LOADER SPINNER OVERLAY -->
-        <div id="global-loader"
-            class="hidden absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center backdrop-blur-sm rounded-2xl">
-            <div class="animate-spin rounded-full h-12 w-12 border-4 border-emerald-600 border-t-transparent mb-3">
-            </div>
-            <p class="text-sm font-semibold text-emerald-800 tracking-wide">Syncing data from Google Sheets...</p>
-        </div>
+/**
+ * Handle HTTP POST Requests
+ */
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return createJsonResponse({ status: "error", message: "No post data received" });
+    }
 
-        <!-- 1. AGENT SIGN-ON -->
-        <div id="view-agent-checkin" class="view-section max-w-md mx-auto bg-[#f8f6f0]">
-            <div class="mb-4">
-                <span class="text-xs font-bold tracking-wider text-gray-500 uppercase">Field Agent Portal</span>
-                <h1 class="text-2xl font-bold tracking-tight">Sign on</h1>
-                <p class="text-sm text-gray-600">Daily check-in & photo upload</p>
-            </div>
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    const payload = data.payload || {};
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Agent Name</label>
-                    <input type="text" id="agent-name-input" placeholder="e.g. Thabo M."
-                        class="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Team Leader Name</label>
-                    <input type="text" id="leader-name-input" placeholder="e.g. Leader A"
-                        class="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Location / Fibrehood</label>
-                    <input type="text" id="location-input" placeholder="e.g. Fibrehood A"
-                        class="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Check-in Photo
-                        (Person)</label>
-                    <label
-                        class="border-2 border-dashed border-gray-300 rounded-xl h-36 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
-                        <i data-lucide="camera" class="w-6 h-6 text-gray-400 mb-1"></i>
-                        <span id="agent-photo-label" class="text-xs font-medium text-gray-700">+ Take photo</span>
-                        <input type="file" accept="image/*" capture="user" class="hidden"
-                            onchange="previewAgentPhoto(event)">
-                    </label>
-                </div>
-            </div>
+    switch (action) {
+      case "submitAgentSignOn":
+      case "submitAgentClockIn":
+        return handleAgentSignOn(ss, payload);
 
-            <button onclick="handleAgentSignOn()"
-                class="w-full bg-[#0b5345] text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-[#083e34] transition-colors mb-2">
-                Sign on & Sync to Google Sheet
-            </button>
-            <p class="text-xs text-center text-gray-500">Signing on after 10:00 AM automatically logs as late.</p>
-        </div>
+      case "submitLeaderCheckIn":
+        return handleLeaderCheckIn(ss, payload);
 
-        <!-- 2. TEAM LEADER CONSOLE -->
-        <div id="view-leader-console" class="view-section max-w-md mx-auto hidden">
-            <div class="mb-4">
-                <span class="text-xs font-bold tracking-wider text-gray-500 uppercase">Team Leader Console</span>
-                <h1 class="text-2xl font-bold tracking-tight">Vehicle & Selfie Check-in</h1>
-            </div>
+      case "setWeeklyObjective":
+        return handleSetWeeklyObjective(ss, payload);
 
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Team Leader Name</label>
-                    <input type="text" id="leader-console-name" placeholder="e.g. Leader A"
-                        class="w-full px-3 py-2 border rounded-xl text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Region / Area Name</label>
-                    <input type="text" id="leader-console-region" placeholder="e.g. Region A"
-                        class="w-full px-3 py-2 border rounded-xl text-sm">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Vehicle Photo</label>
-                        <label
-                            class="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center cursor-pointer hover:bg-gray-50 flex flex-col items-center justify-center h-28">
-                            <span id="vehicle-label" class="text-xs font-medium text-gray-700">+ Vehicle</span>
-                            <input type="file" accept="image/*" capture="environment" class="hidden"
-                                onchange="previewVehiclePhoto(event)">
-                        </label>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Selfie Photo</label>
-                        <label
-                            class="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center cursor-pointer hover:bg-gray-50 flex flex-col items-center justify-center h-28">
-                            <span id="selfie-label" class="text-xs font-medium text-gray-700">+ Selfie</span>
-                            <input type="file" accept="image/*" capture="user" class="hidden"
-                                onchange="previewLeaderSelfie(event)">
-                        </label>
-                    </div>
-                </div>
-            </div>
+      case "logAgentStats":
+        return handleLogAgentStats(ss, payload);
 
-            <button onclick="handleLeaderCheckIn()"
-                class="w-full bg-[#0b5345] text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-[#083e34] transition-colors">
-                Submit Leader Check-in
-            </button>
-        </div>
+      default:
+        return createJsonResponse({ status: "error", message: "Invalid action specified: " + action });
+    }
+  } catch (err) {
+    return createJsonResponse({
+      status: "error",
+      message: err.toString()
+    });
+  }
+}
 
-        <!-- 3. SUPER ADMIN DASHBOARD -->
-        <div id="view-super-admin"
-            class="view-section hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div class="flex flex-wrap justify-between items-center border-b pb-4 mb-6 gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Super Admin Operations Center</h1>
-                    <p class="text-sm text-gray-500">Live oversight of all field agents, team leaders, locations, login
-                        times, and images.</p>
-                </div>
-                <button onclick="loadSuperAdminData()"
-                    class="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-emerald-100 flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Data
-                </button>
-            </div>
+/**
+ * Helper: Create JSON Output with CORS
+ */
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
-            <!-- KPI Summary Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <div class="text-2xl font-bold text-gray-800" id="kpi-total-agents">-</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total Agent Check-ins
-                    </div>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <div class="text-2xl font-bold text-gray-800" id="kpi-total-leaders">-</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total Team Leader
-                        Check-ins</div>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <div class="text-2xl font-bold text-red-600" id="kpi-late-count">-</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Late Sign-ons (&gt;10:00)
-                    </div>
-                </div>
-            </div>
+/**
+ * Get or create a Google Drive Folder for image uploads
+ */
+function getUploadFolder() {
+  const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  const folder = DriveApp.createFolder(FOLDER_NAME);
+  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return folder;
+}
 
-            <!-- Agents Data Table -->
-            <div class="mb-8">
-                <h2 class="text-lg font-bold mb-3 flex items-center gap-2">
-                    <i data-lucide="users" class="w-5 h-5 text-emerald-700"></i> Field Agents Activity & Photos
-                </h2>
-                <div class="overflow-x-auto border rounded-xl">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                <th class="p-3">Date / Time</th>
-                                <th class="p-3">Agent Name</th>
-                                <th class="p-3">Team Leader</th>
-                                <th class="p-3">Location</th>
-                                <th class="p-3">Status</th>
-                                <th class="p-3">Photo Proof</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-agents-tbody" class="divide-y text-sm">
-                            <tr>
-                                <td colspan="6" class="p-4 text-center text-gray-400">Loading agent data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+/**
+ * Save Base64 Image to Google Drive and return its viewable thumbnail/direct URL
+ */
+function saveBase64Image(base64Data, filenamePrefix) {
+  if (!base64Data || !base64Data.startsWith("data:image")) {
+    return "";
+  }
+  try {
+    const parts = base64Data.split(",");
+    const meta = parts[0];
+    const raw = parts[1];
+    const mimeMatch = meta.match(/data:(.*?);base64/);
+    const contentType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = contentType.includes("png") ? "png" : "jpg";
 
-            <!-- Team Leaders Data Table -->
-            <div>
-                <h2 class="text-lg font-bold mb-3 flex items-center gap-2">
-                    <i data-lucide="shield" class="w-5 h-5 text-emerald-700"></i> Team Leaders & Vehicles Check-ins
-                </h2>
-                <div class="overflow-x-auto border rounded-xl">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                <th class="p-3">Date / Time</th>
-                                <th class="p-3">Leader Name</th>
-                                <th class="p-3">Region</th>
-                                <th class="p-3">GPS / Meta</th>
-                                <th class="p-3">Vehicle Photo</th>
-                                <th class="p-3">Selfie Photo</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-leaders-tbody" class="divide-y text-sm">
-                            <tr>
-                                <td colspan="6" class="p-4 text-center text-gray-400">Loading leader data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    const decoded = Utilities.base64Decode(raw);
+    const blob = Utilities.newBlob(decoded, contentType, `${filenamePrefix}_${new Date().getTime()}.${ext}`);
+    const folder = getUploadFolder();
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    // Return direct drive file link
+    return file.getUrl();
+  } catch (err) {
+    Logger.log("Error saving base64 image: " + err);
+    return "";
+  }
+}
 
-    </main>
+/**
+ * Get or create Sheet Tab with header columns
+ */
+function getOrCreateSheet(ss, sheetName, headers) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    if (headers && headers.length > 0) {
+      sheet.appendRow(headers);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#e2e8f0");
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
 
-    <script>
-       document.getElementById('current-date-display').innerText = new Date().toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+/**
+ * 1. Agent Sign-On / Clock-In Handler
+ */
+function handleAgentSignOn(ss, payload) {
+  const sheet = getOrCreateSheet(ss, "AgentSignOns", [
+    "Timestamp", "Date", "Time", "Agent Name", "Team Leader", "Location", "Is Late", "Photo URL", "GPS", "Notes"
+  ]);
 
-        // PASTE YOUR DEPLOYED APPS SCRIPT WEB APP URL HERE:
-        const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzoqUU8FO5eF3TUkiyfdurKfyGU1F56mH2hTcZ_10m9rD4qxcdRCw2hpmJcJi2pQNK9IQ/exec";
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd");
+  const timeStr = Utilities.formatDate(now, TIMEZONE, "HH:mm:ss");
 
-        let agentPhotoBase64 = "";
-        let vehiclePhotoBase64 = "";
-        let selfiePhotoBase64 = ""; // Fixed: renamed from leaderSelfieBase64 to match check-in payload
+  // Determine if late (after 10:00 AM)
+  const hours = parseInt(Utilities.formatDate(now, TIMEZONE, "HH"), 10);
+  const minutes = parseInt(Utilities.formatDate(now, TIMEZONE, "mm"), 10);
+  const isLate = (hours > 10 || (hours === 10 && minutes > 0)) ? "Yes" : "No";
 
-        function showLoader() {
-            document.getElementById('global-loader').classList.remove('hidden');
-        }
+  let photoUrl = "";
+  if (payload.photoBase64) {
+    photoUrl = saveBase64Image(payload.photoBase64, "Agent_" + (payload.agentName || "Selfie").replace(/\s+/g, "_"));
+  }
 
-        function hideLoader() {
-            document.getElementById('global-loader').classList.add('hidden');
-        }
+  sheet.appendRow([
+    now,
+    dateStr,
+    timeStr,
+    payload.agentName || "",
+    payload.leaderName || "",
+    payload.location || "",
+    isLate,
+    photoUrl,
+    payload.gps || "",
+    payload.notes || ""
+  ]);
+  clearCache();
 
-        function switchView(viewId) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById('view-' + viewId).classList.remove('hidden');
+  return createJsonResponse({
+    status: "success",
+    message: "Agent sign-on recorded successfully.",
+    isLate: isLate,
+    photoUrl: photoUrl
+  });
+}
 
-            const buttons = ['agent-checkin', 'leader-console', 'super-admin'];
-            buttons.forEach(id => {
-                const btn = document.getElementById('btn-' + id);
-                if (id === viewId) {
-                    btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors bg-white text-[#0b5345]";
-                } else {
-                    btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors text-white hover:bg-emerald-700";
-                }
-            });
+/**
+ * 2. Team Leader Check-In Handler
+ */
+function handleLeaderCheckIn(ss, payload) {
+  const sheet = getOrCreateSheet(ss, "LeaderCheckIns", [
+    "Timestamp", "Date", "Time", "Leader Name", "Region", "GPS", "Vehicle Photo URL", "Selfie Photo URL"
+  ]);
 
-            if (viewId === 'super-admin') {
-                loadSuperAdminData();
-            }
-        }
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd");
+  const timeStr = Utilities.formatDate(now, TIMEZONE, "HH:mm:ss");
 
-        function previewAgentPhoto(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => { agentPhotoBase64 = e.target.result; document.getElementById('agent-photo-label').innerText = "Attached ✓"; };
-            reader.readAsDataURL(file);
-        }
+  let vehiclePhotoUrl = "";
+  if (payload.vehiclePhotoBase64) {
+    vehiclePhotoUrl = saveBase64Image(payload.vehiclePhotoBase64, "Leader_Vehicle_" + (payload.leaderName || "Leader").replace(/\s+/g, "_"));
+  }
 
-        function previewVehiclePhoto(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => { vehiclePhotoBase64 = e.target.result; document.getElementById('vehicle-label').innerText = "Attached ✓"; };
-            reader.readAsDataURL(file);
-        }
+  let selfiePhotoUrl = "";
+  if (payload.selfiePhotoBase64) {
+    selfiePhotoUrl = saveBase64Image(payload.selfiePhotoBase64, "Leader_Selfie_" + (payload.leaderName || "Leader").replace(/\s+/g, "_"));
+  }
 
-        function previewLeaderSelfie(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => { selfiePhotoBase64 = e.target.result; document.getElementById('selfie-label').innerText = "Attached ✓"; }; // Fixed variable reference
-            reader.readAsDataURL(file);
-        }
+  sheet.appendRow([
+    now,
+    dateStr,
+    timeStr,
+    payload.leaderName || "",
+    payload.region || "",
+    payload.gps || "",
+    vehiclePhotoUrl,
+    selfiePhotoUrl
+  ]);
+  clearCache();
 
-        async function handleAgentSignOn() {
-            const agentName = document.getElementById('agent-name-input').value;
-            const leaderName = document.getElementById('leader-name-input').value;
-            const location = document.getElementById('location-input').value;
+  return createJsonResponse({
+    status: "success",
+    message: "Leader check-in recorded successfully.",
+    vehiclePhotoUrl: vehiclePhotoUrl,
+    selfiePhotoUrl: selfiePhotoUrl
+  });
+}
 
-            if (!agentName || !leaderName) { alert("Please fill in Agent Name and Team Leader Name."); return; }
+/**
+ * 3. Weekly / Daily Objectives Handler
+ */
+function handleSetWeeklyObjective(ss, payload) {
+  const sheet = getOrCreateSheet(ss, "Objectives", [
+    "Timestamp", "View Type", "Target Date", "Leader Name", "Assigned Location", "Focus Areas", "Target Metrics"
+  ]);
 
-            showLoader();
-            try {
-                const response = await fetch(APP_SCRIPT_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify({ action: "submitAgentSignOn", payload: { agentName, leaderName, location, photoUrl: agentPhotoBase64 } })
-                });
-                const result = await response.json();
-                hideLoader();
-                if (result.status === "success") {
-                    alert(result.isLate === "Yes" ? "Signed on successfully, but flagged as late (after 10:00 AM)." : "Signed on successfully!");
-                }
-            } catch (error) { 
-                hideLoader();
-                console.error("Error:", error); 
-                alert("Failed to submit check-in."); 
-            }
-        }
+  const now = new Date();
+  sheet.appendRow([
+    now,
+    payload.viewType || "Weekly",
+    payload.targetDate || Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd"),
+    payload.leaderName || "",
+    payload.assignedLocation || "",
+    payload.focusAreas || "",
+    payload.targetMetrics || "Active Sales"
+  ]);
+  clearCache();
 
-        async function handleLeaderCheckIn() {
-            const leaderName = document.getElementById('leader-console-name').value;
-            const region = document.getElementById('leader-console-region').value;
+  return createJsonResponse({
+    status: "success",
+    message: "Objective published successfully."
+  });
+}
 
-            if (!leaderName || !region) { alert("Please fill in Leader Name and Region."); return; }
+/**
+ * 4. Agent Management / Stats Update Handler
+ */
+function handleLogAgentStats(ss, payload) {
+  const sheet = getOrCreateSheet(ss, "AgentPerformance", [
+    "Timestamp", "Agent Name", "Strikes", "Notes"
+  ]);
 
-            showLoader();
-            try {
-                const response = await fetch(APP_SCRIPT_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify({ 
-                        action: "submitLeaderCheckIn", 
-                        payload: { 
-                            leaderName, 
-                            region, 
-                            vehiclePhotoBase64, 
-                            selfiePhotoBase64, // Now correctly references the declared variable
-                            gps: "-26.2041, 28.0473" 
-                        } 
-                    })
-                });
-                const result = await response.json();
-                hideLoader();
-                if (result.status === "success") { alert("Leader check-in and photos submitted successfully!"); }
-            } catch (error) { 
-                hideLoader();
-                console.error("Error:", error); 
-                alert("Failed to submit leader check-in."); 
-            }
-        }
+  const now = new Date();
+  sheet.appendRow([
+    now,
+    payload.agentName || "",
+    payload.strikes || 0,
+    payload.notes || ""
+  ]);
 
-        async function loadSuperAdminData() {
-            showLoader();
-            try {
-                const response = await fetch(`${APP_SCRIPT_URL}?action=getSuperAdminData`);
-                const data = await response.json();
-                hideLoader();
+  return createJsonResponse({
+    status: "success",
+    message: "Agent performance updated."
+  });
+}
 
-                if (data.status === "success") {
-                    document.getElementById('kpi-total-agents').innerText = data.agents.length;
-                    document.getElementById('kpi-total-leaders').innerText = data.leaders.length;
-                    const lateCount = data.agents.filter(a => a.isLate === "Yes").length;
-                    document.getElementById('kpi-late-count').innerText = lateCount;
+function clearCache() {
+  try {
+    CacheService.getScriptCache().remove("super_admin_data");
+  } catch (e) {
+    Logger.log("Cache clear error: " + e);
+  }
+}
 
-                    // Agents Table
-                    const agentTbody = document.getElementById('admin-agents-tbody');
-                    if (data.agents.length === 0) {
-                        agentTbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No agent sign-ons recorded yet.</td></tr>`;
-                    } else {
-                        agentTbody.innerHTML = data.agents.map(a => `
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-3 text-xs text-gray-500">${a.date} <br>${a.time}</td>
-                                <td class="p-3 font-semibold">${a.agentName}</td>
-                                <td class="p-3">${a.leaderName}</td>
-                                <td class="p-3">${a.location}</td>
-                                <td class="p-3">
-                                    <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${a.isLate === 'Yes' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">
-                                        ${a.isLate === 'Yes' ? 'Late' : 'On Time'}
-                                    </span>
-                                </td>
-                                <td class="p-3">
-                                    ${a.photoUrl && a.photoUrl.startsWith('http') ? `
-                                        <div class="flex items-center gap-2">
-                                            <a href="${a.photoUrl}" target="_blank" title="Click to view full image">
-                                                <img src="${a.photoUrl}" alt="Agent Photo" class="w-12 h-12 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition-opacity">
-                                            </a>
-                                            <a href="${a.photoUrl}" target="_blank" class="text-emerald-700 underline text-xs font-medium">Open</a>
-                                        </div>
-                                    ` : '<span class="text-gray-400 text-xs">No Photo</span>'}
-                                </td>
-                            </tr>
-                        `).join('');
-                    }
+/**
+ * 5. Get Super Admin / Portal Data Handler
+ */
+function getSuperAdminData(ss) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get("super_admin_data");
+  if (cached) {
+    return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  }
 
-                    // Leaders Table
-                    const leaderTbody = document.getElementById('admin-leaders-tbody');
-                    if (data.leaders.length === 0) {
-                        leaderTbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No team leader check-ins recorded yet.</td></tr>`;
-                    } else {
-                        leaderTbody.innerHTML = data.leaders.map(l => `
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-3 text-xs text-gray-500">${l.date} <br>${l.time}</td>
-                                <td class="p-3 font-semibold">${l.leaderName}</td>
-                                <td class="p-3">${l.region}</td>
-                                <td class="p-3 text-xs text-gray-500">${l.gps}</td>
-                                <td class="p-3">
-                                    ${l.photoUrl && l.photoUrl.startsWith('http') ? `
-                                        <div class="flex items-center gap-2">
-                                            <a href="${l.photoUrl}" target="_blank" title="Click to view full image">
-                                                <img src="${l.photoUrl}" alt="Vehicle Photo" class="w-12 h-12 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition-opacity">
-                                            </a>
-                                            <a href="${l.photoUrl}" target="_blank" class="text-emerald-700 underline text-xs font-medium">Vehicle</a>
-                                        </div>
-                                    ` : '<span class="text-gray-400 text-xs">-</span>'}
-                                </td>
-                                <td class="p-3">
-                                    ${l.photoUrl && l.photoUrl.startsWith('http') ? `
-                                        <div class="flex items-center gap-2">
-                                            <a href="${l.photoUrl}" target="_blank" title="Click to view full image">
-                                                <img src="${l.photoUrl}" alt="Selfie Photo" class="w-12 h-12 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition-opacity">
-                                            </a>
-                                            <a href="${l.photoUrl}" target="_blank" class="text-emerald-700 underline text-xs font-medium">Selfie</a>
-                                        </div>
-                                    ` : '<span class="text-gray-400 text-xs">-</span>'}
-                                </td>
-                            </tr>
-                        `).join('');
-                    }
-                    lucide.createIcons();
-                }
-            } catch (err) {
-                hideLoader();
-                console.error("Error fetching super admin data:", err);
-            }
-        }
-    </script>
-</body>
+  const agentSheet = ss.getSheetByName("AgentSignOns");
+  const leaderSheet = ss.getSheetByName("LeaderCheckIns");
 
-</html>
+  const agents = [];
+  if (agentSheet && agentSheet.getLastRow() > 1) {
+    const lastRow = agentSheet.getLastRow();
+    const lastCol = Math.max(agentSheet.getLastColumn(), 10);
+    const data = agentSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    const headers = data[0];
+    
+    // Find column indexes
+    const idxDate = headers.indexOf("Date");
+    const idxTime = headers.indexOf("Time");
+    const idxName = headers.indexOf("Agent Name");
+    const idxLeader = headers.indexOf("Team Leader");
+    const idxLoc = headers.indexOf("Location");
+    const idxLate = headers.indexOf("Is Late");
+    const idxPhoto = headers.indexOf("Photo URL");
+    const idxGPS = headers.indexOf("GPS");
+    const idxNotes = headers.indexOf("Notes");
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[idxName] && !row[0]) continue;
+      agents.push({
+        date: idxDate >= 0 ? row[idxDate] : row[1],
+        time: idxTime >= 0 ? row[idxTime] : row[2],
+        agentName: idxName >= 0 ? row[idxName] : row[3],
+        leaderName: idxLeader >= 0 ? row[idxLeader] : row[4],
+        location: idxLoc >= 0 ? row[idxLoc] : row[5],
+        isLate: idxLate >= 0 ? row[idxLate] : row[6],
+        photoUrl: idxPhoto >= 0 ? row[idxPhoto] : row[7],
+        gps: idxGPS >= 0 ? row[idxGPS] : row[8],
+        notes: idxNotes >= 0 ? row[idxNotes] : row[9]
+      });
+    }
+  }
+
+  const leaders = [];
+  if (leaderSheet && leaderSheet.getLastRow() > 1) {
+    const lastRow = leaderSheet.getLastRow();
+    const lastCol = Math.max(leaderSheet.getLastColumn(), 8);
+    const data = leaderSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    const headers = data[0];
+
+    const idxDate = headers.indexOf("Date");
+    const idxTime = headers.indexOf("Time");
+    const idxName = headers.indexOf("Leader Name");
+    const idxRegion = headers.indexOf("Region");
+    const idxGPS = headers.indexOf("GPS");
+    const idxVeh = headers.indexOf("Vehicle Photo URL");
+    const idxPhoto = headers.indexOf("Selfie Photo URL");
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[idxName] && !row[0]) continue;
+      leaders.push({
+        date: idxDate >= 0 ? row[idxDate] : row[1],
+        time: idxTime >= 0 ? row[idxTime] : row[2],
+        leaderName: idxName >= 0 ? row[idxName] : row[3],
+        region: idxRegion >= 0 ? row[idxRegion] : row[4],
+        gps: idxGPS >= 0 ? row[idxGPS] : row[5],
+        vehicleInfo: idxVeh >= 0 ? row[idxVeh] : row[6],
+        photoUrl: idxPhoto >= 0 ? row[idxPhoto] : row[7]
+      });
+    }
+  }
+
+  const outputPayload = {
+    status: "success",
+    agents: agents.reverse(), // most recent first
+    leaders: leaders.reverse() // most recent first
+  };
+
+  const jsonStr = JSON.stringify(outputPayload);
+  if (jsonStr.length < 95000) {
+    try {
+      cache.put("super_admin_data", jsonStr, 180); // cache for 3 minutes
+    } catch (e) {}
+  }
+
+  return ContentService.createTextOutput(jsonStr).setMimeType(ContentService.MimeType.JSON);
+}
