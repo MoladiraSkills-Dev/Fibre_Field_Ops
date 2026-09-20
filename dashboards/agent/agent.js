@@ -64,6 +64,9 @@ async function fetchAllPortalData(isBackground = false) {
     }
   } catch (err) {
     if (!isBackground) showToast("Connection error.", "error");
+  } finally {
+    // Always hide loader to prevent persistent overlay
+    hideLoader();
   }
 }
 

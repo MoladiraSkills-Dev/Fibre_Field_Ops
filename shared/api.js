@@ -27,13 +27,30 @@ async function postData(action, payload) {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action, payload }),
+      redirect: "follow",
     });
+    
+    // Handle 302 redirects - Google Apps Script sometimes returns these
+    if (res.redirected || res.status === 302) {
+      hideLoader();
+      showToast("API redirect detected. Please redeploy Google Apps Script.", "error");
+      return null;
+    }
+    
     const text = await res.text();
     hideLoader();
-    return JSON.parse(text);
+    
+    // Check if response is valid JSON
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      // If not JSON, return error
+      showToast("Invalid API response. Check Google Apps Script deployment.", "error");
+      return null;
+    }
   } catch (err) {
     hideLoader();
-    showToast(err.message || "Network error.", "error");
+    showToast(err.message || "Network error. Check Google Apps Script deployment.", "error");
     return null;
   }
 }
@@ -41,13 +58,23 @@ async function postData(action, payload) {
 async function getData(action) {
   showLoader();
   try {
-    const res = await fetch(`${APP_SCRIPT_URL}?action=${action}`);
+    const res = await fetch(`${APP_SCRIPT_URL}?action=${action}`, {
+      redirect: "follow",
+    });
+    
+    // Handle 302 redirects
+    if (res.redirected || res.status === 302) {
+      hideLoader();
+      showToast("API redirect detected. Please redeploy Google Apps Script.", "error");
+      return null;
+    }
+    
     const data = await res.json();
     hideLoader();
     return data;
   } catch (err) {
     hideLoader();
-    showToast(err.message || "Network error.", "error");
+    showToast(err.message || "Network error. Check Google Apps Script deployment.", "error");
     return null;
   }
 }

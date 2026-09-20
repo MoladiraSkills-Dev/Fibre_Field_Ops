@@ -60,6 +60,9 @@ async function fetchAllPortalData(isBackground = false) {
       if (icon) icon.classList.remove("animate-spin");
       showToast("Connection error.", "error");
     }
+  } finally {
+    // Always hide loader to prevent persistent overlay
+    hideLoader();
   }
 }
 
