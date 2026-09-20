@@ -87,7 +87,9 @@ function applyPortalData(agents, leaders) {
 // ════ MAP ════
 function initMap() {
   if (!mapInstance) {
-    mapInstance = L.map("map").setView([-26.15, 27.87], 10);
+    mapInstance = L.map("map", {
+      zindex: 1
+    }).setView([-26.15, 27.87], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "© OpenStreetMap",
