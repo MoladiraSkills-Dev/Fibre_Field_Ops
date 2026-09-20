@@ -254,6 +254,52 @@
           </div>
 
           <div
+            class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3"
+          >
+            <h3 class="text-sm font-bold flex items-center gap-2">
+              <span class="bg-purple-100 p-1.5 rounded-lg"
+                ><i
+                  data-lucide="user-plus"
+                  class="w-3.5 h-3.5 text-purple-700"
+                ></i
+              ></span>
+              Add Team Leader
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="text"
+                id="tl-first-name"
+                placeholder="First Name"
+                class="px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition"
+              />
+              <input
+                type="text"
+                id="tl-last-name"
+                placeholder="Last Name"
+                class="px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition"
+              />
+            </div>
+            <input
+              type="email"
+              id="tl-email"
+              placeholder="Email Address"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition"
+            />
+            <input
+              type="password"
+              id="tl-password"
+              placeholder="Temporary Password (Team Leader will change on first login)"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition"
+            />
+            <button
+              onclick="addTeamLeader()"
+              class="w-full bg-purple-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-purple-700 active:scale-[.98] transition-all flex items-center justify-center gap-2"
+            >
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>Add Team Leader
+            </button>
+          </div>
+
+          <div
             class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5"
           >
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">

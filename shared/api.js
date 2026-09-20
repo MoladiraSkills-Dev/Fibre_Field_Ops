@@ -88,6 +88,10 @@ async function registerUser(email, firstName, lastName, password) {
   return await postData("registerUser", { email, firstName, lastName, password });
 }
 
+async function addTeamLeaderAPI(payload) {
+  return await postData("addTeamLeader", payload);
+}
+
 // ════ AGENT API ════
 async function submitAgentSignOnAPI(payload) {
   return await postData("submitAgentSignOn", payload);

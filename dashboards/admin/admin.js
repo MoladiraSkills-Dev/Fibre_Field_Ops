@@ -214,3 +214,42 @@ async function submitWeeklyObjective() {
   } else if (res)
     showToast(res.message || "Calendar save failed.", "error", 6000);
 }
+
+async function addTeamLeader() {
+  const firstName = document.getElementById("tl-first-name").value.trim();
+  const lastName = document.getElementById("tl-last-name").value.trim();
+  const email = document.getElementById("tl-email").value.trim();
+  const password = document.getElementById("tl-password").value;
+
+  if (!firstName || !lastName || !email || !password) {
+    showToast("Please fill in all fields.", "warning");
+    return;
+  }
+
+  if (!email.includes("@")) {
+    showToast("Please enter a valid email address.", "warning");
+    return;
+  }
+
+  if (password.length < 6) {
+    showToast("Password must be at least 6 characters.", "warning");
+    return;
+  }
+
+  const res = await addTeamLeaderAPI({
+    firstName,
+    lastName,
+    email,
+    password,
+    accountType: "Team Leader"
+  });
+
+  if (res && res.status === "success") {
+    showToast(`Team Leader ${firstName} ${lastName} added successfully! ✓`, "success");
+    ["tl-first-name", "tl-last-name", "tl-email", "tl-password"].forEach(
+      (id) => (document.getElementById(id).value = ""),
+    );
+  } else {
+    showToast(res.message || "Failed to add team leader.", "error");
+  }
+}
