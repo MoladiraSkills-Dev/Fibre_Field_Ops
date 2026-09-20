@@ -84,8 +84,8 @@ function clearSession() {
 
 function logout() {
   clearSession();
-  // From any dashboard, go to root index.html
-  window.location.href = "/index.html";
+  // Works for both local and GitHub Pages
+  window.location.href = window.location.origin + "/index.html";
 }
 
 function redirectToDashboard(accountType) {
@@ -105,14 +105,14 @@ function redirectToDashboard(accountType) {
       dashboardPath = "/dashboards/agent/index.html";
   }
 
-  window.location.href = dashboardPath;
+  window.location.href = window.location.origin + dashboardPath;
 }
 
 function requireAuth(requiredRole = null) {
   const session = getSession();
 
   if (!session) {
-    window.location.href = "/index.html";
+    window.location.href = window.location.origin + "/index.html";
     return false;
   }
 
@@ -131,7 +131,7 @@ function getCurrentUser() {
 function checkSession() {
   const session = getSession();
   if (!session) {
-    window.location.href = "/index.html";
+    window.location.href = window.location.origin + "/index.html";
     return false;
   }
   return session;
