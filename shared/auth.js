@@ -84,8 +84,9 @@ function clearSession() {
 
 function logout() {
   clearSession();
-  // Works for both local and GitHub Pages
-  window.location.href = window.location.origin + "/index.html";
+  // GitHub Pages structure: https://88emkay88.github.io/Fibre_Field_Ops/
+  // From dashboards/agent/index.html -> go to repo root
+  window.location.href = window.location.origin + "/Fibre_Field_Ops/";
 }
 
 function redirectToDashboard(accountType) {
@@ -93,16 +94,16 @@ function redirectToDashboard(accountType) {
 
   switch (accountType) {
     case "Employee":
-      dashboardPath = "/dashboards/agent/index.html";
+      dashboardPath = "/Fibre_Field_Ops/dashboards/agent/index.html";
       break;
     case "Team Leader":
-      dashboardPath = "/dashboards/leader/index.html";
+      dashboardPath = "/Fibre_Field_Ops/dashboards/leader/index.html";
       break;
     case "Super":
-      dashboardPath = "/dashboards/admin/index.html";
+      dashboardPath = "/Fibre_Field_Ops/dashboards/admin/index.html";
       break;
     default:
-      dashboardPath = "/dashboards/agent/index.html";
+      dashboardPath = "/Fibre_Field_Ops/dashboards/agent/index.html";
   }
 
   window.location.href = window.location.origin + dashboardPath;
@@ -112,7 +113,7 @@ function requireAuth(requiredRole = null) {
   const session = getSession();
 
   if (!session) {
-    window.location.href = window.location.origin + "/index.html";
+    window.location.href = window.location.origin + "/Fibre_Field_Ops/";
     return false;
   }
 
@@ -131,7 +132,7 @@ function getCurrentUser() {
 function checkSession() {
   const session = getSession();
   if (!session) {
-    window.location.href = window.location.origin + "/index.html";
+    window.location.href = window.location.origin + "/Fibre_Field_Ops/";
     return false;
   }
   return session;
