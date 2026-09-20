@@ -30,13 +30,6 @@ async function postData(action, payload) {
       redirect: "follow",
     });
     
-    // Handle 302 redirects - Google Apps Script sometimes returns these
-    if (res.redirected || res.status === 302) {
-      hideLoader();
-      showToast("API redirect detected. Please redeploy Google Apps Script.", "error");
-      return null;
-    }
-    
     const text = await res.text();
     hideLoader();
     
@@ -61,13 +54,6 @@ async function getData(action) {
     const res = await fetch(`${APP_SCRIPT_URL}?action=${action}`, {
       redirect: "follow",
     });
-    
-    // Handle 302 redirects
-    if (res.redirected || res.status === 302) {
-      hideLoader();
-      showToast("API redirect detected. Please redeploy Google Apps Script.", "error");
-      return null;
-    }
     
     const data = await res.json();
     hideLoader();
