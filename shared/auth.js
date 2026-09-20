@@ -26,12 +26,14 @@ async function handleLogin(e, postDataFunction) {
   const password = document.getElementById("loginPassword").value;
   const res = await postDataFunction("loginUser", { email, password });
 
-  if (res && res.status === "success") {
+  if (res && res.status === "success" && res.user) {
     const user = res.user;
     saveSession(user);
     redirectToDashboard(user.accountType);
   } else if (res) {
-    showAuthAlert(res.message, "error");
+    showAuthAlert(res.message || "Login failed. Please check your credentials.", "error");
+  } else {
+    showAuthAlert("Connection error. Please try again.", "error");
   }
 }
 
