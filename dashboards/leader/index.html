@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FibreGems - Team Leader Dashboard</title>
+    <meta
+      name="description"
+      content="FibreGems team leader dashboard for vehicle check-in and team management."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="../../shared/styles.css" />
+  </head>
+
+  <body class="bg-[#faf8f3] text-gray-900 antialiased min-h-screen">
+    <div id="toast-container"></div>
+    <div id="lightbox" onclick="closeLightbox()">
+      <img id="lightbox-img" src="" alt="Photo proof" />
+    </div>
+    <div id="global-loader" class="hidden">
+      <div
+        class="animate-spin rounded-full h-11 w-11 border-4 border-[#0b5345] border-t-transparent mb-3"
+      ></div>
+      <p class="text-sm font-semibold text-fibregems-primary">
+        Connecting to Operations Center
+      </p>
+    </div>
+
+    <!-- MAIN APP VIEW -->
+    <div id="appView" class="flex flex-col min-h-screen w-full">
+      <header class="bg-[#0b5345] text-white sticky top-0 z-50 shadow-lg">
+        <div
+          class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center"
+        >
+          <div class="flex items-center gap-3">
+            <div class="bg-emerald-500/80 rounded-xl p-1.5">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                stroke-width="2.5"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-base font-extrabold tracking-tight leading-none">
+                FibreGems
+              </h1>
+              <p class="text-[10px] text-emerald-300 font-medium tracking-wide">
+                Team Leader Console
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span
+              id="current-date-display"
+              class="text-[11px] font-semibold bg-white/15 px-2.5 py-1-5 rounded-full tracking-wide"
+            ></span>
+            <button
+              onclick="logout()"
+              class="text-[11px] font-bold bg-red-500/80 hover:bg-red-600 px-3 py-1-5 rounded-full tracking-wide transition shadow-sm border border-red-400"
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-grow max-w-5xl w-full mx-auto px-4 py-5 space-y-4">
+        <!-- TEAM LEADER CONSOLE -->
+        <div
+          id="view-leader"
+          class="view-section space-y-4 max-w-lg mx-auto"
+        >
+          <div
+            class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          >
+            <div
+              class="bg-gradient-to-r from-[#0b5345] to-emerald-600 px-5 py-4"
+            >
+              <h2 class="text-white text-base font-bold">
+                Team Leader Console
+              </h2>
+              <p class="text-emerald-200 text-[11px] mt-0.5">
+                Daily vehicle check &amp; field operations
+              </p>
+            </div>
+            <div class="p-5 space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                    >Leader Name</label
+                  ><input
+                    type="text"
+                    id="leader-name"
+                    placeholder="Your full name"
+                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm transition"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                    >Assigned Region</label
+                  ><input
+                    type="text"
+                    id="leader-region"
+                    placeholder="e.g. Randburg"
+                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm transition"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                  >GPS Location</label
+                >
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    id="leader-gps"
+                    placeholder="Tap pin to auto-capture coordinates"
+                    readonly
+                    class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600"
+                  />
+                  <button
+                    onclick="captureGPS('leader-gps')"
+                    class="px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-100 transition flex-shrink-0"
+                  >
+                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <input type="hidden" id="leader-resolved-location" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                    >Vehicle Photo</label
+                  >
+                  <label
+                    id="vehicle-photo-area"
+                    class="photo-area border-2 border-dashed border-gray-200 rounded-xl h-24 flex flex-col items-center justify-center cursor-pointer overflow-hidden relative"
+                  >
+                    <div
+                      id="vehicle-photo-preview-wrap"
+                      class="hidden absolute inset-0"
+                    >
+                      <img
+                        id="vehicle-photo-preview"
+                        src=""
+                        alt=""
+                        class="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div
+                      id="vehicle-photo-placeholder"
+                      class="flex flex-col items-center gap-1.5 z-10"
+                    >
+                      <i data-lucide="car" class="w-5 h-5 text-gray-400"></i
+                      ><span class="text-[11px] font-medium text-gray-500"
+                        >Vehicle</span
+                      >
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      class="hidden"
+                      onchange="previewPhoto(event, 'vehicle')"
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label
+                    class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                    >Leader Selfie</label
+                  >
+                  <label
+                    id="selfie-photo-area"
+                    class="photo-area border-2 border-dashed border-gray-200 rounded-xl h-24 flex flex-col items-center justify-center cursor-pointer overflow-hidden relative"
+                  >
+                    <div
+                      id="selfie-photo-preview-wrap"
+                      class="hidden absolute inset-0"
+                    >
+                      <img
+                        id="selfie-photo-preview"
+                        src=""
+                        alt=""
+                        class="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div
+                      id="selfie-photo-placeholder"
+                      class="flex flex-col items-center gap-1.5 z-10"
+                    >
+                      <i
+                        data-lucide="user-circle"
+                        class="w-5 h-5 text-gray-400"
+                      ></i
+                      ><span class="text-[11px] font-medium text-gray-500"
+                        >Selfie</span
+                      >
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="user"
+                      class="hidden"
+                      onchange="previewPhoto(event, 'selfie')"
+                    />
+                  </label>
+                </div>
+              </div>
+              <button
+                onclick="submitLeaderCheckIn()"
+                class="w-full bg-[#0b5345] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#094538] active:scale-[.98] transition-all flex items-center justify-center gap-2"
+              >
+                <i data-lucide="check-circle" class="w-4 h-4"></i>Submit Vehicle
+                Check
+              </button>
+            </div>
+          </div>
+          <div
+            class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3"
+          >
+            <h3 class="text-sm font-bold flex items-center gap-2">
+              <span class="bg-emerald-100 p-1.5 rounded-lg"
+                ><i
+                  data-lucide="bar-chart-2"
+                  class="w-3.5 h-3.5 text-emerald-700"
+                ></i
+              ></span>
+              Individual Agent Status
+            </h3>
+            <div class="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                id="manage-agent-name"
+                placeholder="Agent Name"
+                class="px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition"
+              />
+              <select
+                id="manage-agent-status"
+                class="px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] bg-white transition"
+              >
+                <option value="Active">Active on Field</option>
+                <option value="Needs Support">Needs Support</option>
+              </select>
+            </div>
+            <textarea
+              id="manage-agent-notes"
+              placeholder="Performance notes…"
+              rows="2"
+              class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition resize-none"
+            ></textarea>
+            <button
+              onclick="saveAgentManagementNote()"
+              class="w-full bg-emerald-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-emerald-700 active:scale-[.98] transition-all"
+            >
+              Save Agent Note
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="../../shared/api.js"></script>
+    <script src="../../shared/utils.js"></script>
+    <script src="../../shared/auth.js"></script>
+    <script src="leader.js"></script>
+    <script>
+      lucide.createIcons();
+      document.getElementById("current-date-display").innerText =
+        new Date().toLocaleDateString("en-ZA", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        });
+    </script>
+  </body>
+</html>
