@@ -7,9 +7,7 @@ A mobile-first field operations tracker for fiber sales agents and team leaders 
 ### Local Development
 1. Clone the repository
 2. Open `index.html` in a browser
-3. Test with default admin credentials:
-   - Email: `admin@fibregems.co.za`
-   - Password: `AdminPassword123!`
+
 
 ### Production Deployment
 The application is automatically deployed to GitHub Pages when pushed to the `main` branch.
