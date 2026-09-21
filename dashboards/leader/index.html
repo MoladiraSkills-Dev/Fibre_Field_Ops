@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://unpkg.com" />
     <link rel="dns-prefetch" href="https://script.google.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = { corePlugins: { preflight: false } }
@@ -18,33 +18,29 @@
     <link rel="stylesheet" href="../../shared/styles.css" />
   </head>
 
-  <body class="bg-[#faf8f3] text-gray-900 antialiased min-h-screen">
+  <body class="bg-[#f8fafc] text-slate-800 antialiased min-h-screen">
     <div id="toast-container"></div>
     <div id="lightbox" onclick="closeLightbox()">
       <img id="lightbox-img" src="" alt="Photo proof" />
     </div>
     <div id="global-loader" class="hidden">
-      <div class="animate-spin rounded-full h-11 w-11 border-4 border-[#0b5345] border-t-transparent mb-3"></div>
-      <p class="text-sm font-semibold">Connecting to Operations Center</p>
+      <div class="animate-spin rounded-full h-11 w-11 border-4 border-[#f59e0b] border-t-transparent mb-3"></div>
+      <p class="text-sm font-semibold text-[#fbbf24]">Connecting to Operations Center</p>
     </div>
 
     <div id="appView" class="flex flex-col min-h-screen w-full">
-      <!-- HEADER -->
-      <header class="bg-[#0b5345] text-white sticky top-0 z-50 shadow-lg">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+      <!-- HEADER (Option 1: Sleek Horizontal Brand Row) -->
+      <header class="bg-[#0f172a] text-[#f8fafc] sticky top-0 z-50 shadow-md border-b border-[#1e293b]">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex justify-between items-center">
           <div class="flex items-center gap-3">
-            <div class="bg-emerald-500/80 rounded-xl p-1.5">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            </div>
-            <div>
-              <h1 class="text-base font-extrabold tracking-tight leading-none">FibreGems</h1>
-              <p class="text-[10px] text-emerald-300 font-medium tracking-wide">Team Leader Console</p>
+            <img src="../../assets/logo.jpg" alt="FibreGems Logo" class="h-12 w-auto object-contain rounded drop-shadow" />
+            <div class="flex flex-col justify-center">
+              <span class="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight">FibreGems Field Ops</span>
+              <span class="text-[10px] sm:text-[11px] text-[#f59e0b] font-semibold tracking-wide">Team Leader Console</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span id="current-date-display" class="text-[11px] font-semibold bg-white/15 px-2.5 py-1.5 rounded-full tracking-wide"></span>
+            <span id="current-date-display" class="hidden sm:inline-block text-[11px] font-semibold bg-white/10 px-2.5 py-1.5 rounded-full border border-white/10 tracking-wide"></span>
             <button onclick="logout()" class="text-[11px] font-bold bg-red-500/80 hover:bg-red-600 px-3 py-1.5 rounded-full tracking-wide transition shadow-sm border border-red-400">
               Log Out
             </button>
@@ -65,16 +61,16 @@
               <i data-lucide="map-pin" style="width:12px;height:12px;flex-shrink:0;display:inline"></i>
               Capturing location…
             </span>
-            <button onclick="leaderManualRefreshGPS()" class="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 hover:underline py-1">
+            <button onclick="leaderManualRefreshGPS()" class="text-[11px] text-[#f59e0b] font-semibold flex items-center gap-1 hover:text-[#fbbf24] py-1">
               <i data-lucide="refresh-cw" style="width:11px;height:11px"></i> Refresh GPS
             </button>
           </div>
 
           <!-- Check-in form card -->
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-[#0b5345] to-emerald-600 px-5 py-4">
+            <div class="bg-gradient-to-r from-[#0f172a] to-[#1e293b] px-5 py-4 border-b border-[#334155]">
               <h2 class="text-white text-base font-bold">Daily Check-In</h2>
-              <p class="text-emerald-200 text-[11px] mt-0.5">Vehicle check &amp; field operations log</p>
+              <p class="text-[#94a3b8] text-[11px] mt-0.5">Vehicle check &amp; field operations log</p>
             </div>
             <div class="p-5 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -91,7 +87,7 @@
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">GPS Location</label>
                 <div class="flex gap-2">
                   <input type="text" id="leader-gps" placeholder="Tap pin to auto-capture coordinates" readonly class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600" />
-                  <button onclick="leaderManualRefreshGPS()" class="px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 hover:bg-emerald-100 transition flex-shrink-0">
+                  <button onclick="leaderManualRefreshGPS()" class="px-3 py-2.5 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-xl text-[#f59e0b] hover:bg-[#f59e0b]/20 transition flex-shrink-0">
                     <i data-lucide="map-pin" class="w-4 h-4"></i>
                   </button>
                 </div>
@@ -125,7 +121,7 @@
                   </label>
                 </div>
               </div>
-              <button onclick="submitLeaderCheckIn()" class="w-full bg-[#0b5345] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#094538] active:scale-[.98] transition-all flex items-center justify-center gap-2">
+              <button onclick="submitLeaderCheckIn()" class="w-full bg-gradient-to-r from-[#d97706] to-[#f59e0b] text-[#0f172a] text-sm font-bold py-3 rounded-xl hover:from-[#f59e0b] hover:to-[#fbbf24] active:scale-[.98] transition-all flex items-center justify-center gap-2 shadow-sm">
                 <i data-lucide="check-circle" class="w-4 h-4"></i>Submit Vehicle Check
               </button>
             </div>
@@ -138,7 +134,7 @@
                 <span class="bg-emerald-100 p-1.5 rounded-lg"><i data-lucide="users" class="w-3.5 h-3.5 text-emerald-700"></i></span>
                 Today's Agent Sign-Ons
               </h3>
-              <button onclick="fetchAllPortalData(false)" class="text-[10px] font-bold text-emerald-700 flex items-center gap-1 hover:underline">
+              <button onclick="fetchAllPortalData(false)" class="text-[10px] font-bold text-[#f59e0b] flex items-center gap-1 hover:text-[#fbbf24]">
                 <i data-lucide="refresh-cw" style="width:10px;height:10px"></i> Refresh
               </button>
             </div>
@@ -162,7 +158,7 @@
 
           <!-- Request objective form -->
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-4">
+            <div class="bg-gradient-to-r from-blue-700 to-blue-600 px-5 py-4">
               <h2 class="text-white text-base font-bold">Request an Objective</h2>
               <p class="text-blue-100 text-[11px] mt-0.5">Submit a request to Admin — they will approve &amp; publish it</p>
             </div>
@@ -189,11 +185,17 @@
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Focus Areas</label>
                 <input type="text" id="req-focus" placeholder="e.g. Door-to-door activations, lead generation" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
               </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Metrics</label>
-                <input type="text" id="req-metrics" placeholder="e.g. 20 leads, 5 payments" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Metrics</label>
+                  <input type="text" id="req-metrics" placeholder="e.g. 20 leads, 5 payments" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Target Houses</label>
+                  <input type="number" id="req-target-houses" min="1" placeholder="e.g. 50" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
+                </div>
               </div>
-              <button onclick="submitObjectiveRequest()" class="w-full bg-blue-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-blue-700 active:scale-[.98] transition-all flex items-center justify-center gap-2">
+              <button onclick="submitObjectiveRequest()" class="w-full bg-blue-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-blue-700 active:scale-[.98] transition-all flex items-center justify-center gap-2 shadow-sm">
                 <i data-lucide="send" class="w-3.5 h-3.5"></i>Send Request to Admin
               </button>
             </div>
@@ -201,13 +203,13 @@
 
           <!-- Assigned objectives list -->
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-[#0b5345] to-emerald-600 px-5 py-4">
+            <div class="bg-gradient-to-r from-[#0f172a] to-[#1e293b] px-5 py-4 border-b border-[#334155]">
               <h2 class="text-white text-base font-bold">Active Objectives</h2>
-              <p class="text-emerald-200 text-[11px] mt-0.5">Published objectives from Admin</p>
+              <p class="text-[#94a3b8] text-[11px] mt-0.5">Published objectives from Admin</p>
             </div>
             <div id="leader-objectives-list" class="p-5 space-y-3">
               <div class="text-center py-6">
-                <div class="animate-spin rounded-full h-6 w-6 border-2 border-[#0b5345] border-t-transparent mx-auto mb-2"></div>
+                <div class="animate-spin rounded-full h-6 w-6 border-2 border-[#f59e0b] border-t-transparent mx-auto mb-2"></div>
                 <p class="text-[11px] text-gray-400">Loading objectives…</p>
               </div>
             </div>
@@ -215,36 +217,81 @@
         </div>
 
         <!-- ══════════════════════════════════════
-             TAB 3: AGENT STATS
+             TAB 3: AGENT STATS & PERFORMANCE LOG
         ══════════════════════════════════════ -->
         <div id="tab-stats" class="tab-panel space-y-3 max-w-lg mx-auto">
-          <!-- Update individual agent -->
+
+          <!-- ── Log Daily KPIs (Field Performance) ── -->
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-purple-700 to-purple-500 px-5 py-4">
-              <h2 class="text-white text-base font-bold">Log Agent Performance</h2>
-              <p class="text-purple-100 text-[11px] mt-0.5">Update individual agent status &amp; notes</p>
+            <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+              <h2 class="text-white text-base font-bold">📊 Log Agent Daily KPIs</h2>
+              <p class="text-emerald-100 text-[11px] mt-0.5">Record field performance for agents on your team</p>
             </div>
             <div class="p-5 space-y-3">
-              <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Agent</label>
+                <select id="kpi-agent-select" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] bg-white transition">
+                  <option value="">-- Select Agent --</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
                 <div>
-                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Agent Name</label>
-                  <input type="text" id="manage-agent-name" placeholder="Agent Name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Engagements</label>
+                  <input type="number" id="kpi-engagements" min="0" placeholder="0" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition text-center" />
                 </div>
                 <div>
-                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Status</label>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Real Leads</label>
+                  <input type="number" id="kpi-leads" min="0" placeholder="0" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition text-center" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Payments</label>
+                  <input type="number" id="kpi-payments" min="0" placeholder="0" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition text-center" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Notes (optional)</label>
+                <input type="text" id="kpi-notes" placeholder="e.g. Strong performance, needs follow-up on leads…" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition" />
+              </div>
+              <button onclick="submitAgentKPIs()" class="w-full bg-emerald-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-emerald-700 active:scale-[.98] transition-all flex items-center justify-center gap-2 shadow-sm">
+                <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>Save KPI Record
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Log Issue / Strike ── -->
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-700 to-purple-600 px-5 py-4">
+              <h2 class="text-white text-base font-bold">⚠️ Log Issue / Strike Record</h2>
+              <p class="text-purple-100 text-[11px] mt-0.5">Record disciplinary issues or performance concerns</p>
+            </div>
+            <div class="p-5 space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Select Agent</label>
+                  <select id="manage-agent-select" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] bg-white transition">
+                    <option value="">-- Select Agent --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Issue Type</label>
                   <select id="manage-agent-status" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] bg-white transition">
-                    <option value="Active">Active on Field</option>
-                    <option value="Needs Support">Needs Support</option>
-                    <option value="Absent">Absent / No Show</option>
+                    <option value="Strike 1 - First Warning">Strike 1 - First Warning</option>
+                    <option value="Strike 2 - Second Warning">Strike 2 - Second Warning</option>
+                    <option value="Strike 3 - Final Strike">Strike 3 - Final Strike</option>
+                    <option value="Absent / No Show">Absent / No Show</option>
+                    <option value="Late Sign-on">Late Sign-on</option>
+                    <option value="Needs Support">Needs Support / Training</option>
+                    <option value="Misconduct">Misconduct</option>
+                    <option value="Other Performance Note">Other Performance Note</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Performance Notes</label>
-                <textarea id="manage-agent-notes" placeholder="Performance notes…" rows="2" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition resize-none"></textarea>
+                <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Incident Notes</label>
+                <textarea id="manage-agent-notes" placeholder="Describe the incident or reason for record…" rows="2" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[11px] transition resize-none"></textarea>
               </div>
-              <button onclick="saveAgentManagementNote()" class="w-full bg-purple-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-purple-700 active:scale-[.98] transition-all flex items-center justify-center gap-2">
-                <i data-lucide="save" class="w-3.5 h-3.5"></i>Save Agent Record
+              <button onclick="saveAgentManagementNote()" class="w-full bg-purple-600 text-white text-[11px] font-bold py-2.5 rounded-xl hover:bg-purple-700 active:scale-[.98] transition-all flex items-center justify-center gap-2 shadow-sm">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>Log Issue / Strike Record
               </button>
             </div>
           </div>
@@ -262,12 +309,12 @@
             </div>
           </div>
 
-          <!-- Agent performance records -->
+          <!-- Agent performance records / strikes logged -->
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="px-5 py-3.5 border-b border-gray-50">
               <h3 class="text-sm font-bold flex items-center gap-2">
                 <span class="bg-amber-100 p-1.5 rounded-lg"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i></span>
-                Performance Records (Strikes)
+                Performance Records &amp; Strike Log
               </h3>
               <p class="text-[10px] text-gray-400 mt-0.5">Consecutive miss tracking — visible to Leaders &amp; Admin</p>
             </div>

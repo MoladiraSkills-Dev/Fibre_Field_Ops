@@ -56,12 +56,13 @@ function autoCaptureSilentGPS() {
       document.getElementById('agent-gps').value = coordsStr;
       try {
         const res = await postData('getReadableLocation', { lat, lon });
-        if (res && res.status === 'success' && res.address) {
-          document.getElementById('agent-location').value = res.address;
+        const locName = (res && res.display_name) ? res.display_name : (res && res.address ? res.address : null);
+        if (res && res.status === 'success' && locName) {
+          document.getElementById('agent-location').value = locName;
           const hiddenLoc = document.getElementById('agent-resolved-location');
-          if (hiddenLoc) hiddenLoc.value = res.address;
-          setLocationChips(res.address, 'success');
-          showToast(`📍 ${res.address}`, 'success', 3500);
+          if (hiddenLoc) hiddenLoc.value = locName;
+          setLocationChips(locName, 'success');
+          showToast(`📍 ${locName}`, 'success', 3500);
         } else {
           setLocationChips(`${lat.toFixed(4)}, ${lon.toFixed(4)}`, 'success');
         }
@@ -180,7 +181,8 @@ function renderObjectives(objectives) {
       </div>
       ${o.assignedLocation ? `<p class="text-[11px] text-gray-600 flex items-center gap-1 mb-1">📍 ${o.assignedLocation}</p>` : ''}
       ${o.focusAreas ? `<p class="text-[11px] font-semibold text-emerald-700 mt-1">🎯 ${o.focusAreas}</p>` : ''}
-      ${o.targetMetrics ? `<p class="text-[11px] text-gray-500 mt-0.5">Target: ${o.targetMetrics}</p>` : ''}
+      ${o.targetHouses ? `<p class="text-[11px] font-semibold text-amber-700 mt-0.5">🏠 Target: ${o.targetHouses} houses</p>` : ''}
+      ${o.targetMetrics ? `<p class="text-[11px] text-gray-500 mt-0.5">Metrics: ${o.targetMetrics}</p>` : ''}
     </div>
   `).join('');
 }

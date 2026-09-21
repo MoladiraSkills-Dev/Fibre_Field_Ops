@@ -25,7 +25,7 @@ const photoStateMap = {
 
 // Override previewPhoto to use leader-specific state map
 const originalPreviewPhoto = window.previewPhoto;
-window.previewPhoto = function(event, type) {
+window.previewPhoto = function (event, type) {
   originalPreviewPhoto(event, type, photoStateMap);
 };
 
@@ -49,12 +49,12 @@ function setupLeaderCalendar() {
   function updateCalendarInput() {
     const viewType = typeSelect.value;
     const now = new Date();
-    
+
     if (viewType === "Day") {
       dateInput.type = "date";
       dateInput.min = now.toISOString().split("T")[0];
       if (!dateInput.value || dateInput.value < dateInput.min) dateInput.value = dateInput.min;
-    } 
+    }
     else if (viewType === "Week") {
       dateInput.type = "week";
       const year = now.getFullYear();
@@ -64,7 +64,7 @@ function setupLeaderCalendar() {
       const weekStr = `${year}-W${weekNumber.toString().padStart(2, '0')}`;
       dateInput.min = weekStr;
       if (!dateInput.value || dateInput.value < weekStr) dateInput.value = weekStr;
-    } 
+    }
     else if (viewType === "Month") {
       dateInput.type = "month";
       const monthStr = now.toISOString().split("T")[0].substring(0, 7);
@@ -101,14 +101,17 @@ function autoCaptureSilentGPS() {
       document.getElementById('leader-gps').value = coordsStr;
       try {
         const res = await postData('getReadableLocation', { lat, lon });
-        if (res && res.status === 'success' && res.address) {
-          document.getElementById('leader-region').value = res.address;
+        const locName = (res && res.display_name) ? res.display_name : (res && res.address ? res.address : null);
+        if (res && res.status === 'success' && locName) {
+          document.getElementById('leader-region').value = locName;
           const hiddenLoc = document.getElementById('leader-resolved-location');
-          if (hiddenLoc) hiddenLoc.value = res.address;
-          setLeaderLocationChips(res.address, 'success');
-          showToast(`📍 ${res.address}`, 'success', 3500);
+          if (hiddenLoc) hiddenLoc.value = locName;
+          setLeaderLocationChips(locName, 'success');
+          showToast(`📍 ${locName}`, 'success', 3500);
         } else {
           setLeaderLocationChips(`${lat.toFixed(4)}, ${lon.toFixed(4)}`, 'success');
+
+          console.log(res.display_name, "display name", res)
         }
       } catch (e) {
         setLeaderLocationChips(`${lat.toFixed(4)}, ${lon.toFixed(4)}`, 'success');
@@ -141,7 +144,7 @@ function initializeDashboardData() {
     try {
       const parsed = JSON.parse(cached);
       applyPortalData(parsed.agents || [], parsed.leaders || [], parsed.objectives || [], parsed.agentStats || []);
-    } catch (e) {}
+    } catch (e) { }
   }
   fetchAllPortalData(true);
 }
@@ -172,9 +175,41 @@ async function fetchAllPortalData(isBackground = false) {
 function applyPortalData(agents, leaders, objectives, agentStats) {
   allLeaderPortalData = { agents, leaders, objectives, agentStats };
   const myName = leaderSession ? `${leaderSession.firstName} ${leaderSession.lastName}`.trim() : '';
+  populateAgentDropdown(agents, myName);
   renderTodayAgents(agents, myName);
   renderLeaderObjectives(objectives, myName);
   renderLeaderTeamStats(agents, agentStats, myName);
+}
+
+function populateAgentDropdown(agents, myName) {
+  const selects = [
+    document.getElementById("manage-agent-select"),
+    document.getElementById("kpi-agent-select")
+  ].filter(Boolean);
+
+  if (selects.length === 0) return;
+
+  const myAgents = (agents || []).filter(a =>
+    !myName || (a.leaderName || '').toLowerCase().trim() === myName.toLowerCase().trim()
+  );
+
+  const uniqueAgentNames = [...new Set(myAgents.map(a => a.agentName).filter(Boolean))];
+  
+  // If no agents found specifically for this leader, show all known agents as fallback
+  const namesToDisplay = uniqueAgentNames.length > 0 
+    ? uniqueAgentNames 
+    : [...new Set((agents || []).map(a => a.agentName).filter(Boolean))];
+
+  selects.forEach(select => {
+    const currentVal = select.value;
+    select.innerHTML = `<option value="">-- Select Agent --</option>`;
+    namesToDisplay.forEach(name => {
+      select.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+    if (currentVal && namesToDisplay.includes(currentVal)) {
+      select.value = currentVal;
+    }
+  });
 }
 
 // ════ TAB 1: TODAY'S AGENT SIGN-ONS ════
@@ -244,7 +279,8 @@ function renderLeaderObjectives(objectives, myName) {
       </div>
       ${o.assignedLocation ? `<p class="text-[11px] text-gray-600 mb-1">📍 ${o.assignedLocation}</p>` : ''}
       ${o.focusAreas ? `<p class="text-[11px] font-semibold text-emerald-700 mt-1">🎯 ${o.focusAreas}</p>` : ''}
-      ${o.targetMetrics ? `<p class="text-[11px] text-gray-500 mt-0.5">Target: ${o.targetMetrics}</p>` : ''}
+      ${o.targetHouses ? `<p class="text-[11px] font-semibold text-amber-700 mt-0.5">🏠 Target: ${o.targetHouses} houses</p>` : ''}
+      ${o.targetMetrics ? `<p class="text-[11px] text-gray-500 mt-0.5">Metrics: ${o.targetMetrics}</p>` : ''}
     </div>
   `).join('');
 }
@@ -257,6 +293,7 @@ async function submitObjectiveRequest() {
   const assignedLocation = document.getElementById('req-location').value.trim();
   const focusAreas = document.getElementById('req-focus').value.trim();
   const targetMetrics = document.getElementById('req-metrics').value.trim();
+  const targetHouses = document.getElementById('req-target-houses')?.value.trim() || "";
 
   if (!targetDate) { showToast("Please select a target date.", "warning"); return; }
   if (!focusAreas) { showToast("Please describe the focus areas.", "warning"); return; }
@@ -268,11 +305,15 @@ async function submitObjectiveRequest() {
     assignedLocation,
     focusAreas,
     targetMetrics: targetMetrics || 'Active Sales',
+    targetHouses,
   });
 
   if (res && res.status === "success") {
     showToast("Objective request sent to Admin! ✓", "success");
-    ["req-location", "req-focus", "req-metrics"].forEach(id => (document.getElementById(id).value = ""));
+    ["req-location", "req-focus", "req-metrics", "req-target-houses"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
     document.getElementById("req-target-date").valueAsDate = new Date();
   } else if (res) {
     showToast(res.message || "Request failed.", "error");
@@ -342,18 +383,87 @@ function renderPerfRecords(agentStats) {
 
   container.innerHTML = `
     <div class="divide-y divide-gray-50">
-      ${agentStats.map((s, i) => `
-        <div class="flex items-center justify-between px-4 py-2.5 ${i % 2 ? 'stat-row-alt' : ''}">
-          <div>
-            <p class="text-[11px] font-semibold text-gray-800">${s.agentName || '—'}</p>
-            <p class="text-[10px] text-gray-400">${formatSheetDate(s.date)} · ${s.notes || '—'}</p>
+      ${agentStats.map((s, i) => {
+        const strikes = parseInt(s.strikes || 0);
+        const hasKPIs = (s.engagements && s.engagements !== '0') || (s.realLeads && s.realLeads !== '0') || (s.payments && s.payments !== '0') || s.issueType === 'Daily Field KPIs';
+        const issueType = s.issueType || (hasKPIs ? 'Daily Field KPIs' : strikes > 0 ? `${strikes} Strike${strikes > 1 ? 's' : ''}` : 'Performance Note');
+        const isSevere = strikes >= 2 || (issueType && (issueType.includes('2') || issueType.includes('3') || issueType.toLowerCase().includes('misconduct') || issueType.toLowerCase().includes('absent')));
+        const badgeClass = hasKPIs ? 'badge-ontime' : isSevere ? 'badge-strike' : strikes > 0 ? 'badge-late' : 'badge-ontime';
+
+        return `
+          <div class="flex items-start justify-between px-4 py-3 ${i % 2 ? 'stat-row-alt' : ''}">
+            <div class="pr-2">
+              <div class="flex items-center gap-2">
+                <p class="text-[11px] font-bold text-gray-800">${s.agentName || '—'}</p>
+                ${s.leaderName ? `<span class="text-[9px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">By: ${s.leaderName}</span>` : ''}
+              </div>
+              <p class="text-[10px] text-gray-400 mt-0.5">${formatSheetDate(s.date)} ${s.time ? `· ${formatSheetTime(s.time)}` : ''}</p>
+              ${hasKPIs ? `
+                <div class="flex flex-wrap gap-1.5 mt-1">
+                  <span class="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100">
+                    👥 ${s.engagements || 0} Engagements
+                  </span>
+                  <span class="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">
+                    🎯 ${s.realLeads || 0} Leads
+                  </span>
+                  <span class="text-[10px] font-semibold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-100">
+                    💳 ${s.payments || 0} Payments
+                  </span>
+                </div>
+              ` : ''}
+              <p class="text-[11px] text-gray-600 mt-1">${s.notes || s.issueType || '—'}</p>
+            </div>
+            <span class="${badgeClass} text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
+              ${issueType}
+            </span>
           </div>
-          <div class="flex items-center gap-1.5">
-            ${parseInt(s.strikes || 0) > 0 ? `<span class="badge-late text-[10px] font-bold px-2 py-0.5 rounded-full">${s.strikes} Strike${s.strikes > 1 ? 's' : ''}</span>` : `<span class="badge-ontime text-[10px] font-bold px-2 py-0.5 rounded-full">Active</span>`}
-          </div>
-        </div>
-      `).join('')}
+        `;
+      }).join('')}
     </div>`;
+}
+
+// ════ LOG AGENT DAILY FIELD KPIS ════
+async function submitAgentKPIs() {
+  const selectEl = document.getElementById("kpi-agent-select");
+  const agentName = selectEl ? selectEl.value.trim() : "";
+  const engagements = document.getElementById("kpi-engagements").value.trim();
+  const leads = document.getElementById("kpi-leads").value.trim();
+  const payments = document.getElementById("kpi-payments").value.trim();
+  const notes = document.getElementById("kpi-notes").value.trim();
+  const leaderName = leaderSession ? `${leaderSession.firstName} ${leaderSession.lastName}`.trim() : "";
+
+  if (!agentName) {
+    showToast("Please select an agent from your team.", "warning");
+    return;
+  }
+  if (!engagements && !leads && !payments && !notes) {
+    showToast("Please enter at least one KPI value or note.", "warning");
+    return;
+  }
+
+  showToast("Saving agent KPIs…", "info", 2000);
+  const res = await logAgentStatsAPI({
+    leaderName,
+    agentName,
+    engagements: engagements || "0",
+    realLeads: leads || "0",
+    payments: payments || "0",
+    strikes: 0,
+    issueType: "Daily Field KPIs",
+    notes: notes || `Field KPIs: ${engagements || 0} Eng, ${leads || 0} Leads, ${payments || 0} Payments`
+  });
+
+  if (res && res.status === "success") {
+    showToast(`KPIs recorded for ${agentName}! ✓`, "success");
+    if (selectEl) selectEl.value = "";
+    document.getElementById("kpi-engagements").value = "";
+    document.getElementById("kpi-leads").value = "";
+    document.getElementById("kpi-payments").value = "";
+    document.getElementById("kpi-notes").value = "";
+    fetchAllPortalData(true);
+  } else if (res) {
+    showToast(res.message || "Failed to save KPIs.", "error");
+  }
 }
 
 // ════ CHECK-IN SUBMISSION ════
@@ -386,21 +496,35 @@ async function submitLeaderCheckIn() {
   } else if (res) showToast(res.message || "Submission failed.", "error");
 }
 
-// ════ SAVE AGENT NOTE ════
+// ════ SAVE AGENT ISSUE & PERFORMANCE NOTE ════
 async function saveAgentManagementNote() {
-  const agentName = document.getElementById("manage-agent-name").value.trim();
-  const status = document.getElementById("manage-agent-status").value;
+  const selectEl = document.getElementById("manage-agent-select");
+  const agentName = selectEl ? selectEl.value.trim() : "";
+  const issueType = document.getElementById("manage-agent-status").value;
   const notes = document.getElementById("manage-agent-notes").value.trim();
-  if (!agentName) { showToast("Enter the agent name.", "warning"); return; }
+  const leaderName = leaderSession ? `${leaderSession.firstName} ${leaderSession.lastName}`.trim() : "";
 
-  const res = await logAgentStatsAPI({
+  if (!agentName) { showToast("Please select an agent from your team.", "warning"); return; }
+
+  let strikes = 0;
+  if (issueType.includes("Strike 1")) strikes = 1;
+  else if (issueType.includes("Strike 2")) strikes = 2;
+  else if (issueType.includes("Strike 3")) strikes = 3;
+  else if (issueType.includes("Absent")) strikes = 2;
+  else if (issueType.includes("Misconduct")) strikes = 2;
+  else if (issueType.includes("Late")) strikes = 1;
+
+  const res = await logAgentIssueAPI({
+    leaderName,
     agentName,
-    strikes: status === "Needs Support" ? 1 : status === "Absent" ? 2 : 0,
-    notes: notes || status,
+    issueType,
+    strikes,
+    notes: notes || issueType,
   });
+
   if (res && res.status === "success") {
-    showToast("Agent record saved. ✓", "success");
-    document.getElementById("manage-agent-name").value = "";
+    showToast(`Issue recorded for ${agentName}. ✓`, "success");
+    if (selectEl) selectEl.value = "";
     document.getElementById("manage-agent-notes").value = "";
     fetchAllPortalData(true);
   } else if (res) showToast(res.message || "Update failed.", "error");

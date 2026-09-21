@@ -1,101 +1,320 @@
-# Add Team Leader Function for Google Apps Script
+# Backend Functions & Sheet Schema Migration (`Code.gs`)
 
-## Instructions
+This guide provides:
+1. **`migrateAndExtendSheets()`**: An automatic, non-destructive migration script that adds any missing columns to your existing Google Sheets.
+2. **Dynamic read & write handlers**: For Objectives (`Target Houses`), `AgentSignOns`, and `AgentStats` (`Issue Type`, `Leader Name`, `Notes`).
+3. **Team Leader Management**: `addTeamLeader` & `deleteTeamLeader`.
 
-Add this function to your `code.gs` file in Google Apps Script:
+---
 
-### 1. Add this to the `doPost` switch statement:
+## 🚀 1. One-Click Sheet Migration Script
 
-Add this case in the `doPost` function's switch statement:
-
-```javascript
-case "addTeamLeader":
-  return createJsonResponse(addTeamLeader(payload.firstName, payload.lastName, payload.email, payload.password, payload.accountType));
-```
-
-### 2. Add this new function to code.gs:
+Add this function to `Code.gs` and run `migrateAndExtendSheets()` once from the Apps Script editor menu (or let it run automatically). It checks your existing headers and appends any missing columns without altering your existing data:
 
 ```javascript
 /**
- * Add a new Team Leader (Admin-only function)
- * Creates a user with Team Leader account type
+ * Run this function once from the Apps Script toolbar to automatically
+ * add missing columns to your existing sheets without losing any data.
  */
-function addTeamLeader(firstName, lastName, email, password, accountType) {
+function migrateAndExtendSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Objectives Sheet (supports either 'WeeklyObjectives' or 'Objectives')
+  const objSheetName = ss.getSheetByName("Objectives") ? "Objectives" : "WeeklyObjectives";
+  extendSheetHeaders(ss, objSheetName, [
+    "Date", "View Type", "Target Date", "Leader Name",
+    "Assigned Location", "Focus Areas", "Target Metrics", "Status", "Requested By",
+    "Target Houses"
+  ]);
+
+  // 2. AgentSignOns Sheet
+  extendSheetHeaders(ss, "AgentSignOns", [
+    "Date", "Time", "Agent Name", "Leader Name", "Location",
+    "Photo URL", "Is Late (After 10)", "GPS", "Location Detail", "Notes"
+  ]);
+
+  // 3. AgentStats Sheet (Extending with Time, Leader Name, Issue Type, Notes)
+  extendSheetHeaders(ss, "AgentStats", [
+    "Date", "Agent Name", "Engagements", "Real Leads", "Payments",
+    "Consecutive Misses (Strikes)", "Time", "Leader Name", "Issue Type", "Notes"
+  ]);
+
+  // 4. LeaderCheckIns Sheet
+  extendSheetHeaders(ss, "LeaderCheckIns", [
+    "Date", "Time", "Leader Name", "Region", "Vehicle Info", "Photo URL", "GPS", "Location"
+  ]);
+
+  // 5. Users Sheet
+  extendSheetHeaders(ss, "Users", [
+    "Email", "First Name", "Last Name", "Password Hash", "Salt", "Account Type", "Status", "Reset Token"
+  ]);
+
+  clearCache();
+  Logger.log("✅ All sheets checked and successfully extended!");
+}
+
+/**
+ * Safely inspects Row 1 of target sheet and appends missing column headers
+ */
+function extendSheetHeaders(ss, sheetName, expectedHeaders) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(expectedHeaders);
+    sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight("bold");
+    Logger.log(`Created new sheet: ${sheetName}`);
+    return;
+  }
+
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+
+  const missingHeaders = [];
+  expectedHeaders.forEach(h => {
+    if (!currentHeaders.includes(h)) {
+      missingHeaders.push(h);
+    }
+  });
+
+  if (missingHeaders.length > 0) {
+    const startCol = lastCol + 1;
+    sheet.getRange(1, startCol, 1, missingHeaders.length).setValues([missingHeaders]).setFontWeight("bold");
+    Logger.log(`Extended ${sheetName} with columns: ${missingHeaders.join(", ")}`);
+  } else {
+    Logger.log(`${sheetName} already has all required columns.`);
+  }
+}
+```
+
+---
+
+## 📝 2. `doPost` Switch Statement
+
+Ensure these actions are handled in your `doPost(e)`:
+
+```javascript
+switch (action) {
+  case "loginUser":
+    return createJsonResponse(loginUser(payload.email, payload.password));
+  case "registerUser":
+    return createJsonResponse(registerUser(payload.email, payload.firstName, payload.lastName, payload.password));
+  case "addTeamLeader":
+    return createJsonResponse(addTeamLeader(payload.firstName, payload.lastName, payload.email, payload.password, payload.accountType));
+  case "deleteTeamLeader":
+    return createJsonResponse(deleteTeamLeader(payload.email));
+  case "submitAgentSignOn":
+  case "submitAgentClockIn":
+    return handleAgentSignOn(ss, payload);
+  case "submitLeaderCheckIn":
+    return handleLeaderCheckIn(ss, payload);
+  case "setWeeklyObjective":
+    return handleSetWeeklyObjective(ss, payload);
+  case "requestObjective":
+    return handleRequestObjective(ss, payload);
+  case "approveObjective":
+    return handleApproveObjective(ss, payload);
+  case "logAgentStats":
+  case "logAgentIssue":
+    return handleLogAgentStats(ss, payload);
+  default:
+    return createJsonResponse({ status: "error", message: "Invalid action: " + action });
+}
+```
+
+---
+
+## 🎯 3. Objectives Handlers (with `Target Houses`)
+
+```javascript
+function handleSetWeeklyObjective(ss, payload) {
+  const sheetName = ss.getSheetByName("Objectives") ? "Objectives" : "WeeklyObjectives";
+  const sheet = ss.getSheetByName(sheetName);
+  
+  // Header: Date, View Type, Target Date, Leader Name, Assigned Location, Focus Areas, Target Metrics, Status, Requested By, Target Houses
+  sheet.appendRow([
+    new Date(),
+    payload.viewType || "Week",
+    payload.targetDate || "",
+    payload.leaderName || "",
+    payload.assignedLocation || "",
+    payload.focusAreas || "",
+    payload.targetMetrics || "",
+    payload.status || "Published",
+    payload.requestedBy || "Admin",
+    payload.targetHouses || ""
+  ]);
+
+  clearCache();
+  return createJsonResponse({ status: "success", message: "Objective published." });
+}
+
+function handleRequestObjective(ss, payload) {
+  const sheetName = ss.getSheetByName("Objectives") ? "Objectives" : "WeeklyObjectives";
+  const sheet = ss.getSheetByName(sheetName);
+
+  sheet.appendRow([
+    new Date(),
+    payload.viewType || "Week",
+    payload.targetDate || "",
+    payload.leaderName || "",
+    payload.assignedLocation || "",
+    payload.focusAreas || "",
+    payload.targetMetrics || "",
+    "Pending",
+    payload.leaderName || "Team Leader",
+    payload.targetHouses || ""
+  ]);
+
+  clearCache();
+  return createJsonResponse({ status: "success", message: "Objective request submitted." });
+}
+```
+
+---
+
+## ⚠️ 4. Agent Performance & Strike Records Handler
+
+Matches your `AgentStats` layout:
+`[Date, Agent Name, Engagements, Real Leads, Payments, Consecutive Misses (Strikes), Time, Leader Name, Issue Type, Notes]`
+
+```javascript
+function handleLogAgentStats(ss, payload) {
+  let sheet = ss.getSheetByName("AgentStats");
+  if (!sheet) {
+    migrateAndExtendSheets();
+    sheet = ss.getSheetByName("AgentStats");
+  }
+
+  sheet.appendRow([
+    new Date(),
+    payload.agentName || "",
+    payload.engagements || "",
+    payload.realLeads || "",
+    payload.payments || "",
+    payload.strikes || 0,
+    formatTime(new Date()),
+    payload.leaderName || "",
+    payload.issueType || "Performance Note",
+    payload.notes || ""
+  ]);
+
+  clearCache();
+  return createJsonResponse({ status: "success", message: "Performance record saved." });
+}
+```
+
+---
+
+## 👥 5. Team Leader Deletion Function
+
+```javascript
+function deleteTeamLeader(email) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = getOrCreateUsersSheet(ss);
     const data = sheet.getDataRange().getValues();
-    const emailLower = String(email).trim().toLowerCase();
+    const emailLower = String(email || "").trim().toLowerCase();
 
-    // Check if user already exists
+    if (!emailLower) {
+      return { status: "error", message: "Email is required." };
+    }
+
+    let deleted = false;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][0] && data[i][0].toString().toLowerCase() === emailLower) {
-        return { status: "error", message: "User with this email already exists." };
+      if (data[i][0] && String(data[i][0]).trim().toLowerCase() === emailLower) {
+        sheet.deleteRow(i + 1);
+        deleted = true;
+        break;
       }
     }
 
-    // Validate inputs
-    if (!firstName || !lastName || !email || !password) {
-      return { status: "error", message: "All fields are required." };
+    if (!deleted) {
+      return { status: "error", message: "Team Leader not found." };
     }
 
-    if (!email.includes("@")) {
-      return { status: "error", message: "Invalid email address." };
-    }
-
-    if (password.length < 6) {
-      return { status: "error", message: "Password must be at least 6 characters." };
-    }
-
-    // Create the user with Team Leader account type
-    const salt = generateSalt(16);
-    const hash = computeSHA256(password, salt);
-    
-    sheet.appendRow([
-      emailLower, 
-      firstName, 
-      lastName, 
-      hash, 
-      salt, 
-      accountType || "Team Leader", 
-      "Verified", 
-      ""
-    ]);
-    
-    // Clear any cached data
     clearCache();
-    
-    return { 
-      status: "success", 
-      message: `Team Leader ${firstName} ${lastName} added successfully. They should change their password on first login.` 
-    };
+    return { status: "success", message: `Team Leader ${email} removed successfully.` };
   } catch (err) {
     return { status: "error", message: "Server error: " + err.toString() };
   }
 }
 ```
 
-### 3. Deploy the updated script
+---
 
-After adding the function:
-1. Go to your Google Apps Script project
-2. Click "Deploy" → "Manage deployments"
-3. Create a new deployment (or update existing)
-4. Set "Who has access" to "Anyone"
-5. Copy the new URL and update `shared/api.js`
+## 📊 6. Reading Data in `getSuperAdminData` / `getPortalData`
 
-## How It Works
+Ensure your data mapper reads by headers or updated column indices:
 
-- Admins can add team leaders through the Super Admin dashboard
-- A temporary password is set during creation
-- Team leaders can change their password on first login (this can be added later as a "Change Password" feature)
-- The function validates email format and password length
-- Checks for duplicate email addresses before creating user
+```javascript
+function getSuperAdminData(ss) {
+  // Objectives
+  const objSheet = ss.getSheetByName("Objectives") || ss.getSheetByName("WeeklyObjectives");
+  const objectives = [];
+  if (objSheet && objSheet.getLastRow() > 1) {
+    const rows = objSheet.getRange(2, 1, objSheet.getLastRow() - 1, objSheet.getLastColumn()).getValues();
+    rows.forEach((r, idx) => {
+      objectives.push({
+        rowIndex: idx + 2,
+        date: r[0],
+        viewType: r[1],
+        targetDate: r[2],
+        leaderName: r[3],
+        assignedLocation: r[4],
+        focusAreas: r[5],
+        targetMetrics: r[6],
+        status: r[7] || "Published",
+        requestedBy: r[8] || "",
+        targetHouses: r[9] || ""
+      });
+    });
+  }
 
-## Future Enhancements
+  // Agent Stats
+  const statSheet = ss.getSheetByName("AgentStats");
+  const agentStats = [];
+  if (statSheet && statSheet.getLastRow() > 1) {
+    const rows = statSheet.getRange(2, 1, statSheet.getLastRow() - 1, statSheet.getLastColumn()).getValues();
+    rows.forEach(r => {
+      agentStats.push({
+        date: r[0],
+        agentName: r[1],
+        engagements: r[2],
+        realLeads: r[3],
+        payments: r[4],
+        strikes: r[5] || 0,
+        time: r[6] || "",
+        leaderName: r[7] || "",
+        issueType: r[8] || (r[5] ? `${r[5]} Strike(s)` : ""),
+        notes: r[9] || ""
+      });
+    });
+  }
 
-You may want to add:
-1. A "Change Password" feature for team leaders to update their password
-2. Email notification to new team leaders with their temporary password
-3. Ability to deactivate or delete team leaders
-4. List of all team leaders in the admin dashboard
+  // Users -> Team Leaders List
+  const usersSheet = ss.getSheetByName("Users");
+  const teamLeadersList = [];
+  if (usersSheet && usersSheet.getLastRow() > 1) {
+    const uRows = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, usersSheet.getLastColumn()).getValues();
+    uRows.forEach(r => {
+      if (String(r[5]).toLowerCase() === "team leader") {
+        teamLeadersList.push({
+          email: r[0],
+          firstName: r[1],
+          lastName: r[2],
+          fullName: `${r[1]} ${r[2]}`.trim()
+        });
+      }
+    });
+  }
+
+  return {
+    status: "success",
+    agents: getAgentDataRows(ss),
+    leaders: getLeaderDataRows(ss),
+    objectives: objectives.reverse(),
+    agentStats: agentStats.reverse(),
+    teamLeadersList: teamLeadersList
+  };
+}
+```

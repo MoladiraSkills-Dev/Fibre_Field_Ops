@@ -51,8 +51,9 @@ async function postData(action, payload) {
 async function getData(action) {
   showLoader();
   try {
-    const res = await fetch(`${APP_SCRIPT_URL}?action=${action}`, {
+    const res = await fetch(`${APP_SCRIPT_URL}?action=${action}&t=${Date.now()}`, {
       redirect: "follow",
+      cache: "no-store"
     });
 
     const data = await res.json();
@@ -78,6 +79,10 @@ async function addTeamLeaderAPI(payload) {
   return await postData("addTeamLeader", payload);
 }
 
+async function deleteTeamLeaderAPI(email) {
+  return await postData("deleteTeamLeader", { email });
+}
+
 // ════ AGENT API ════
 async function submitAgentSignOnAPI(payload) {
   return await postData("submitAgentSignOn", payload);
@@ -94,6 +99,14 @@ async function submitLeaderCheckInAPI(payload) {
 
 async function logAgentStatsAPI(payload) {
   return await postData("logAgentStats", payload);
+}
+
+async function logAgentIssueAPI(payload) {
+  return await postData("logAgentStats", payload);
+}
+
+async function deleteAgentStatAPI(payload) {
+  return await postData("deleteAgentStat", payload);
 }
 
 async function getLeaderData() {
