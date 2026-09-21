@@ -110,7 +110,28 @@ async function getSuperAdminData() {
 }
 
 async function getReadableLocation(lat, lon) {
-  return await postData("getReadableLocation", { lat, lon });
+  try {
+    const apiKey = "pk.1be07ee2080691339d8fc4f1712dbc95";
+    const url = `https://us1.locationiq.com/v1/reverse?key=${apiKey}&lat=${lat}&lon=${lon}&format=json`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data && data.address) {
+      const addr = data.address;
+      const localArea = addr.suburb || addr.neighbourhood || addr.residential || "";
+      const city = addr.city || addr.town || addr.village || addr.county || "";
+
+      let parts = [];
+      if (localArea) parts.push(localArea);
+      if (city && city !== localArea) parts.push(city);
+
+      if (parts.length > 0) return { status: "success", address: parts.join(", ") };
+      return { status: "success", address: data.display_name.split(",").slice(0, 3).join(",") };
+    }
+    return { status: "error", message: "Location not found" };
+  } catch (err) {
+    return { status: "error", message: err.toString() };
+  }
 }
 
 // ════ OBJECTIVES API ════

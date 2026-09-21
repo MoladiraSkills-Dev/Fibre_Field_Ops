@@ -197,12 +197,12 @@
         const password = document.getElementById("loginPassword").value;
         const res = await postData("loginUser", { email, password });
         
-        if (res && res.status === "success") {
+        if (res && res.status === "success" && res.user) {
           const user = res.user;
           saveSession(user);
           redirectToDashboard(user.accountType);
         } else if (res) {
-          showAuthAlert(res.message, "error");
+          showAuthAlert(res.message || "Invalid API response. User data missing.", "error");
         }
       }
 
