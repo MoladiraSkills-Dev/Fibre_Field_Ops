@@ -29,10 +29,10 @@ async function postData(action, payload) {
       body: JSON.stringify({ action, payload }),
       redirect: "follow",
     });
-    
+
     const text = await res.text();
     hideLoader();
-    
+
     // Check if response is valid JSON
     try {
       return JSON.parse(text);
@@ -54,7 +54,7 @@ async function getData(action) {
     const res = await fetch(`${APP_SCRIPT_URL}?action=${action}`, {
       redirect: "follow",
     });
-    
+
     const data = await res.json();
     hideLoader();
     return data;
@@ -109,7 +109,15 @@ async function getSuperAdminData() {
   return await getData("getSuperAdminData");
 }
 
-// ════ SHARED API ════
 async function getReadableLocation(lat, lon) {
   return await postData("getReadableLocation", { lat, lon });
+}
+
+// ════ OBJECTIVES API ════
+async function requestObjectiveAPI(payload) {
+  return await postData("requestObjective", payload);
+}
+
+async function approveObjectiveAPI(payload) {
+  return await postData("approveObjective", payload);
 }
