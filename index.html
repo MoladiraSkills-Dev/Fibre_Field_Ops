@@ -21,6 +21,21 @@
     tailwind.config = {
       corePlugins: {
         preflight: false,
+      },
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#E07C2A',
+              light: '#F1A328',
+              dark: '#CE5926',
+              tint: '#F2D5BE',
+            }
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
       }
     }
   </script>
