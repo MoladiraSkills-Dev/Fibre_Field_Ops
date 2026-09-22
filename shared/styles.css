@@ -420,6 +420,8 @@ textarea:focus {
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
+  margin: 0;
   z-index: 1000;
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
@@ -557,4 +559,22 @@ textarea:focus {
 .kpi-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 @media (min-width: 480px) {
   .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════
+   CUSTOM SCROLLBAR
+════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent-orange);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-orange-hover);
 }
