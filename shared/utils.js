@@ -87,7 +87,14 @@ function previewPhoto(event, type, photoStateMap) {
 }
 
 function openLightbox(url) {
-  document.getElementById("lightbox-img").src = url;
+  let rawUrl = url;
+  const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+  if (id && !url.includes("lh3.googleusercontent.com") && !url.includes("uc?export=view")) {
+    rawUrl = `https://drive.google.com/uc?export=view&id=${id}`;
+  }
+  document.getElementById("lightbox-img").src = rawUrl;
   document.getElementById("lightbox").classList.add("open");
 }
 
@@ -125,8 +132,10 @@ function isToday(dateVal) {
 function driveThumb(url) {
   if (!url || !url.startsWith("http")) return null;
   if (url.includes("lh3.googleusercontent.com")) return url;
-  const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120`;
+  const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+  if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
   return url;
 }
 
@@ -134,8 +143,10 @@ function photoCell(url, alt) {
   const thumb = driveThumb(url);
   if (!thumb)
     return `<span class="text-gray-400 text-[10px]">No Photo</span>`;
-  const safe = url.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  return `<img src="${thumb}" loading="lazy" decoding="async" class="photo-thumb" onclick="openLightbox('${safe}')" alt="${alt}" onerror="this.outerHTML='<a href=&quot;${safe}&quot; target=&quot;_blank&quot; class=&quot;text-blue-600 underline text-[10px]&quot;>Open</a>'">`;
+  const safeUrl = url.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const safeThumb = thumb.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  
+  return `<img src="${safeThumb}" loading="lazy" decoding="async" class="photo-thumb" onclick="openLightbox('${safeUrl}')" alt="${alt}" onerror="this.outerHTML='<a href=&quot;${safeUrl}&quot; target=&quot;_blank&quot; class=&quot;text-blue-600 underline text-[10px]&quot;>Open</a>'">`;
 }
 
 // ════ MAP UTILITIES ════
