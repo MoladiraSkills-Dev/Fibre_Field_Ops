@@ -91,10 +91,17 @@ function openLightbox(url) {
   const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   const id = m1 ? m1[1] : (m2 ? m2[1] : null);
-  if (id && !url.includes("lh3.googleusercontent.com") && !url.includes("uc?export=view")) {
-    rawUrl = `https://drive.google.com/uc?export=view&id=${id}`;
+  if (id && !url.includes("lh3.googleusercontent.com")) {
+    rawUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w2000`;
   }
   document.getElementById("lightbox-img").src = rawUrl;
+  
+  // Update the fallback download/open link to safely point to the Drive view page
+  const downloadBtn = document.getElementById("lightbox-download-btn");
+  if (downloadBtn) {
+    downloadBtn.href = id ? `https://drive.google.com/file/d/${id}/view` : url;
+  }
+  
   document.getElementById("lightbox").classList.add("open");
 }
 
@@ -130,20 +137,33 @@ function isToday(dateVal) {
 }
 
 function driveThumb(url) {
-  if (!url || !url.startsWith("http")) return null;
-  if (url.includes("lh3.googleusercontent.com")) return url;
-  const m1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (!url) return null;
+  let cleanUrl = String(url).trim();
+  const mdMatch = cleanUrl.match(/(https?:\/\/[^\s\)]+)/);
+  if (mdMatch) cleanUrl = mdMatch[1];
+  else if (!cleanUrl.startsWith("http")) return null;
+
+  if (cleanUrl.includes("lh3.googleusercontent.com")) return cleanUrl;
+  const m1 = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const m2 = cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   const id = m1 ? m1[1] : (m2 ? m2[1] : null);
-  if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
-  return url;
+  
+  // Use the /thumbnail endpoint to bypass ORB and Google's hotlink restrictions for <img> tags
+  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+  return cleanUrl;
 }
 
 function photoCell(url, alt) {
-  const thumb = driveThumb(url);
+  if (!url) return `<span class="text-gray-400 text-[10px]">No Photo</span>`;
+  let cleanUrl = String(url).trim();
+  const mdMatch = cleanUrl.match(/(https?:\/\/[^\s\)]+)/);
+  if (mdMatch) cleanUrl = mdMatch[1];
+
+  const thumb = driveThumb(cleanUrl);
   if (!thumb)
     return `<span class="text-gray-400 text-[10px]">No Photo</span>`;
-  const safeUrl = url.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  
+  const safeUrl = cleanUrl.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const safeThumb = thumb.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   
   return `<img src="${safeThumb}" loading="lazy" decoding="async" class="photo-thumb" onclick="openLightbox('${safeUrl}')" alt="${alt}" onerror="this.outerHTML='<a href=&quot;${safeUrl}&quot; target=&quot;_blank&quot; class=&quot;text-blue-600 underline text-[10px]&quot;>Open</a>'">`;
