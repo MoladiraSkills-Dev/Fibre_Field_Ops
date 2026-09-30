@@ -20,6 +20,14 @@ const FOLDER_NAME = "FibreGems_Uploads";
 const TIMEZONE = "Africa/Johannesburg"; // SAST (UTC+2)
 const LOCATIONIQ_API_KEY = "pk.1be07ee2080691339d8fc4f1712dbc95";
 
+// ── Cache key constants & TTLs ──
+const CACHE_KEY_PORTAL      = "fibregems_portal_data_v2";   // Full portal payload
+const CACHE_KEY_TODAY       = "fibregems_today_data_v2";    // Today-scoped agents + leaders
+const CACHE_KEY_OBJECTIVES  = "fibregems_objectives_v2";    // Objectives only
+const CACHE_TTL_PORTAL      = 300;   // 5 minutes – full data, changes less often
+const CACHE_TTL_TODAY       = 180;   // 3 minutes – today's sign-ins change frequently
+const CACHE_TTL_OBJECTIVES  = 240;   // 4 minutes
+
 // ════════════════════════════════════════════════════════════════════════════
 // 2. HTTP GET HANDLER
 // ════════════════════════════════════════════════════════════════════════════
@@ -33,6 +41,9 @@ function doGet(e) {
     }
     if (action === "getObjectivesData") {
       return getObjectivesDataHandler(ss);
+    }
+    if (action === "getTodayAgents") {
+      return getTodayAgentsHandler(ss);
     }
     return createJsonResponse({ status: "success", message: "FibreGems Operations API is active." });
   } catch (err) {
@@ -305,7 +316,7 @@ function registerUser(ss, email, firstName, lastName, password) {
     const salt = generateSalt(16);
     const hash = computeSHA256(password, salt);
     sheet.appendRow([emailLower, firstName, lastName, hash, salt, "Agent", "Verified", ""]);
-    clearCache();
+    bustCacheKeys([CACHE_KEY_PORTAL]);
     return { status: "success", message: "Registration successful. Please log in." };
   } catch (err) {
     return { status: "error", message: "Server error: " + err.toString() };
@@ -370,7 +381,7 @@ function addTeamLeader(ss, firstName, lastName, email, password, accountType) {
       ""
     ]);
     
-    clearCache();
+    bustCacheKeys([CACHE_KEY_PORTAL]);
     return { 
       status: "success", 
       message: `Team Leader ${firstName} ${lastName} added successfully.` 
@@ -403,7 +414,7 @@ function deleteTeamLeader(ss, email) {
       return { status: "error", message: "Team Leader not found." };
     }
 
-    clearCache();
+    bustCacheKeys([CACHE_KEY_PORTAL]);
     return { status: "success", message: `Team Leader ${email} removed successfully.` };
   } catch (err) {
     return { status: "error", message: "Server error: " + err.toString() };
@@ -441,7 +452,9 @@ function handleAgentSignOn(ss, payload) {
     payload.resolvedLocation || "",                 // I: Location Detail
     payload.taskNotes || payload.notes || ""        // J: Notes
   ]);
-  clearCache();
+  // A new sign-on only invalidates today's cache and the full portal cache.
+  // Objectives and Users data are untouched.
+  bustCacheKeys([CACHE_KEY_PORTAL, CACHE_KEY_TODAY]);
   return createJsonResponse({ status: "success", message: "Sign-on recorded.", isLate: isLate, photoUrl: photoUrl });
 }
 
@@ -470,7 +483,7 @@ function handleLeaderCheckIn(ss, payload) {
     selfiePhotoUrl,                                 // G: Selfie/Photo URL
     payload.location || payload.region || ""        // H: Location
   ]);
-  clearCache();
+  bustCacheKeys([CACHE_KEY_PORTAL, CACHE_KEY_TODAY]);
   return createJsonResponse({ status: "success", message: "Check-in recorded.", vehiclePhotoUrl, selfiePhotoUrl });
 }
 
@@ -492,7 +505,8 @@ function handleSetWeeklyObjective(ss, payload) {
     payload.requestedBy || "Admin",
     payload.targetHouses || ""
   ]);
-  clearCache();
+  // Objectives don't affect today's sign-on data
+  bustCacheKeys([CACHE_KEY_PORTAL, CACHE_KEY_OBJECTIVES]);
   return createJsonResponse({ status: "success", message: "Objective published." });
 }
 
@@ -514,7 +528,7 @@ function handleRequestObjective(ss, payload) {
     payload.leaderName || "Team Leader",
     payload.targetHouses || ""
   ]);
-  clearCache();
+  bustCacheKeys([CACHE_KEY_PORTAL, CACHE_KEY_OBJECTIVES]);
   return createJsonResponse({ status: "success", message: "Objective request submitted for Admin review." });
 }
 
@@ -534,7 +548,7 @@ function handleApproveObjective(ss, payload) {
   }
 
   sheet.getRange(rowIndex, statusCol).setValue(payload.status || "Published");
-  clearCache();
+  bustCacheKeys([CACHE_KEY_PORTAL, CACHE_KEY_OBJECTIVES]);
   return createJsonResponse({ status: "success", message: `Objective ${payload.status}.` });
 }
 
@@ -559,189 +573,271 @@ function handleLogAgentStats(ss, payload) {
     payload.issueType || (payload.strikes ? `${payload.strikes} Strike(s)` : "Performance Note"),
     payload.notes || ""
   ]);
-  clearCache();
+  bustCacheKeys([CACHE_KEY_PORTAL]);
   return createJsonResponse({ status: "success", message: "Performance record saved." });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // 9. CACHE UTILITIES
 // ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Clears ALL cache keys (used when data structure changes or full reset needed).
+ */
 function clearCache() {
-  try { 
-    CacheService.getScriptCache().remove("super_admin_portal_data"); 
-    CacheService.getScriptCache().remove("super_admin_data"); 
+  try {
+    const c = CacheService.getScriptCache();
+    c.removeAll([CACHE_KEY_PORTAL, CACHE_KEY_TODAY, CACHE_KEY_OBJECTIVES,
+                 "super_admin_portal_data", "super_admin_data"]); // legacy keys
+  } catch (e) { }
+}
+
+/**
+ * Granular cache invalidation — only bust the keys affected by a write.
+ * @param {string[]} keys  Array of CACHE_KEY_* constants to remove.
+ */
+function bustCacheKeys(keys) {
+  try {
+    CacheService.getScriptCache().removeAll(keys);
+  } catch (e) { }
+}
+
+/**
+ * Safe cache put — silently swallows the 100 kB Apps Script limit error.
+ */
+function safeCachePut(key, value, ttlSeconds) {
+  try {
+    if (value && value.length < 95000) {
+      CacheService.getScriptCache().put(key, value, ttlSeconds);
+    }
   } catch (e) { }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // 10. DATA RETRIEVAL (GET PORTAL DATA)
 // ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Reads all rows from a named sheet and maps them through a callback.
+ * Returns an empty array if the sheet doesn't exist or has no data rows.
+ */
+function readSheetRows(ss, sheetName, mapper) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const data = sheet.getDataRange().getValues();
+  const results = [];
+  for (let i = 1; i < data.length; i++) {
+    const mapped = mapper(data[i], data[0], i);
+    if (mapped !== null && mapped !== undefined) results.push(mapped);
+  }
+  return results;
+}
+
+/** Returns today's date string in SAST (yyyy-MM-dd) for cache-key scoping. */
+function todayKey() {
+  return Utilities.formatDate(new Date(), TIMEZONE, "yyyy-MM-dd");
+}
+
+function buildAgentRows(ss) {
+  return readSheetRows(ss, "AgentSignOns", (row) => {
+    if (!row[2] && !row[0]) return null;
+    return {
+      date: row[0],
+      time: row[1],
+      agentName: row[2],
+      leaderName: row[3],
+      location: row[4],
+      photoUrl: row[5],
+      isLate: row[6],
+      gps: row[7],
+      notes: row[9] || row[8] || ""
+    };
+  });
+}
+
+function buildLeaderRows(ss) {
+  const sheet = ss.getSheetByName("LeaderCheckIns");
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idx = (name) => {
+    const n = String(name).trim().toLowerCase();
+    const i = headers.findIndex(h => String(h).trim().toLowerCase() === n);
+    return i >= 0 ? i : null;
+  };
+  const iDate     = idx("date")                  ?? 0;
+  const iTime     = idx("time")                  ?? 1;
+  const iName     = idx("leader name")           ?? 2;
+  const iRegion   = idx("region")                ?? 3;
+  const iVeh      = idx("odometer/vehicle info") ?? (idx("vehicle info") ?? 4);
+  const iGPS      = idx("gps")                   ?? 5;
+  const iPhoto    = idx("selfie/photo url")      ?? (idx("photo url") ?? 6);
+  const iLocation = idx("location")              ?? 7;
+
+  const results = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[iName] && !row[0]) continue;
+    results.push({
+      date: row[iDate],
+      time: row[iTime],
+      leaderName: row[iName],
+      region: row[iRegion],
+      vehicleInfo: row[iVeh],
+      photoUrl: row[iPhoto],
+      gps: row[iGPS],
+      location: row[iLocation] || row[iRegion] || ""
+    });
+  }
+  return results;
+}
+
+function buildObjectivesRows(ss) {
+  const sheet = ss.getSheetByName("Objectives") || ss.getSheetByName("WeeklyObjectives");
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idx = (name) => { const i = headers.indexOf(name); return i >= 0 ? i : null; };
+  const iDate       = idx("Date")             ?? 0;
+  const iViewType   = idx("View Type")        ?? 1;
+  const iTargetDate = idx("Target Date")      ?? 2;
+  const iLeader     = idx("Leader Name")      ?? 3;
+  const iLocation   = idx("Assigned Location")  ?? 4;
+  const iFocus      = idx("Focus Areas")      ?? 5;
+  const iMetrics    = idx("Target Metrics")   ?? 6;
+  const iStatus     = idx("Status")           ?? 7;
+  const iReqBy      = idx("Requested By")     ?? 8;
+  const iHouses     = idx("Target Houses")    ?? 9;
+
+  const results = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (!r[0]) continue;
+    results.push({
+      rowIndex:        i + 1,
+      date:            r[iDate],
+      viewType:        r[iViewType],
+      targetDate:      r[iTargetDate],
+      leaderName:      r[iLeader],
+      assignedLocation:r[iLocation],
+      focusAreas:      r[iFocus],
+      targetMetrics:   r[iMetrics],
+      status:          (iStatus !== null && r[iStatus]) ? r[iStatus] : "Published",
+      requestedBy:     (iReqBy  !== null && r[iReqBy])  ? r[iReqBy]  : "Admin",
+      targetHouses:    (iHouses !== null && r[iHouses]) ? r[iHouses] : ""
+    });
+  }
+  return results;
+}
+
+function buildAgentStatsRows(ss) {
+  return readSheetRows(ss, "AgentStats", (r) => {
+    if (!r[1] && !r[0]) return null;
+    return {
+      date:        r[0],
+      agentName:   r[1],
+      engagements: r[2] || "",
+      realLeads:   r[3] || "",
+      payments:    r[4] || "",
+      strikes:     r[5] || 0,
+      time:        r[6] || "",
+      leaderName:  r[7] || "",
+      issueType:   r[8] || (r[5] ? `${r[5]} Strike(s)` : "Performance Note"),
+      notes:       r[9] || r[3] || ""
+    };
+  });
+}
+
+function buildTeamLeadersList(ss) {
+  return readSheetRows(ss, "Users", (r, headers) => {
+    const iRole = headers.indexOf("Account Type");
+    if (iRole < 0 || String(r[iRole]).trim().toLowerCase() !== "team leader") return null;
+    const iEmail = headers.indexOf("Email")      >= 0 ? headers.indexOf("Email")      : 0;
+    const iFirst = headers.indexOf("First Name") >= 0 ? headers.indexOf("First Name") : 1;
+    const iLast  = headers.indexOf("Last Name")  >= 0 ? headers.indexOf("Last Name")  : 2;
+    return {
+      firstName: r[iFirst],
+      lastName:  r[iLast],
+      email:     r[iEmail],
+      fullName:  `${r[iFirst]} ${r[iLast]}`.trim()
+    };
+  });
+}
+
+/**
+ * Main data fetch — full portal payload with layered caching.
+ * CACHE_KEY_PORTAL  = 5 min (full payload)
+ * CACHE_KEY_TODAY   = 3 min (today's sign-ins, stored separately so they
+ *                            can be invalidated independently on new sign-ons)
+ */
 function getSuperAdminData(ss) {
   const cache = CacheService.getScriptCache();
-  const cached = cache.get("super_admin_portal_data");
-  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
 
-  // ── 1. Agent Sign-Ons ──
-  const agents = [];
-  const agentSheet = ss.getSheetByName("AgentSignOns");
-  if (agentSheet && agentSheet.getLastRow() > 1) {
-    const data = agentSheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row[2] && !row[0]) continue;
-      agents.push({
-        date: row[0],
-        time: row[1],
-        agentName: row[2],
-        leaderName: row[3],
-        location: row[4],
-        photoUrl: row[5],
-        isLate: row[6],
-        gps: row[7],
-        notes: row[9] || row[8] || ""
-      });
-    }
+  // 1. Try the full-portal cache first
+  const cachedPortal = cache.get(CACHE_KEY_PORTAL);
+  if (cachedPortal) {
+    return ContentService.createTextOutput(cachedPortal).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 2. Leader Check-Ins ──
-  const leaders = [];
-  const leaderSheet = ss.getSheetByName("LeaderCheckIns");
-  if (leaderSheet && leaderSheet.getLastRow() > 1) {
-    const data = leaderSheet.getDataRange().getValues();
-    const headers = data[0];
-    const idx = (name) => { 
-      const n = String(name).trim().toLowerCase();
-      const i = headers.findIndex(h => String(h).trim().toLowerCase() === n);
-      return i >= 0 ? i : null; 
-    };
-    const iDate = idx("Date") ?? 0;
-    const iTime = idx("Time") ?? 1;
-    const iName = idx("Leader Name") ?? 2;
-    const iRegion = idx("Region") ?? 3;
-    const iVeh = idx("Odometer/Vehicle Info") ?? (idx("Vehicle Info") ?? 4);
-    const iGPS = idx("GPS") ?? 5;
-    const iPhoto = idx("Selfie/Photo URL") ?? (idx("Photo URL") ?? 6);
-    const iLocation = idx("Location") ?? 7;
+  // 2. Build data
+  const agents         = buildAgentRows(ss).reverse();
+  const leaders        = buildLeaderRows(ss).reverse();
+  const objectives     = buildObjectivesRows(ss).reverse();
+  const agentStats     = buildAgentStatsRows(ss).reverse();
+  const teamLeadersList = buildTeamLeadersList(ss);
 
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row[iName] && !row[0]) continue;
-      leaders.push({
-        date: row[iDate],
-        time: row[iTime],
-        leaderName: row[iName],
-        region: row[iRegion],
-        vehicleInfo: row[iVeh],
-        photoUrl: row[iPhoto],
-        gps: row[iGPS],
-        location: row[iLocation] || row[iRegion] || ""
-      });
-    }
-  }
+  // 3. Build and cache today-scoped subset (used by the map filter)
+  const todayStr = todayKey();
+  const todayPayload = JSON.stringify({
+    status: "success",
+    todayDate: todayStr,
+    agents:  agents.filter(a  => String(a.date  || "").startsWith(todayStr)),
+    leaders: leaders.filter(l => String(l.date  || "").startsWith(todayStr))
+  });
+  safeCachePut(CACHE_KEY_TODAY, todayPayload, CACHE_TTL_TODAY);
 
-  // ── 3. Objectives ──
-  const objectives = [];
-  const objSheet = ss.getSheetByName("Objectives") || ss.getSheetByName("WeeklyObjectives");
-  if (objSheet && objSheet.getLastRow() > 1) {
-    const data = objSheet.getDataRange().getValues();
-    const headers = data[0];
-    const idx = (name) => { const i = headers.indexOf(name); return i >= 0 ? i : null; };
-    const iDate = idx("Date") ?? 0;
-    const iViewType = idx("View Type") ?? 1;
-    const iTargetDate = idx("Target Date") ?? 2;
-    const iLeader = idx("Leader Name") ?? 3;
-    const iLocation = idx("Assigned Location") ?? 4;
-    const iFocus = idx("Focus Areas") ?? 5;
-    const iMetrics = idx("Target Metrics") ?? 6;
-    const iStatus = idx("Status") ?? 7;
-    const iReqBy = idx("Requested By") ?? 8;
-    const iHouses = idx("Target Houses") ?? 9;
-
-    for (let i = 1; i < data.length; i++) {
-      const r = data[i];
-      if (!r[0]) continue;
-      objectives.push({
-        rowIndex: i + 1,
-        date: r[iDate],
-        viewType: r[iViewType],
-        targetDate: r[iTargetDate],
-        leaderName: r[iLeader],
-        assignedLocation: r[iLocation],
-        focusAreas: r[iFocus],
-        targetMetrics: r[iMetrics],
-        status: (iStatus !== null && r[iStatus]) ? r[iStatus] : "Published",
-        requestedBy: (iReqBy !== null && r[iReqBy]) ? r[iReqBy] : "Admin",
-        targetHouses: (iHouses !== null && r[iHouses]) ? r[iHouses] : ""
-      });
-    }
-  }
-
-  // ── 4. Agent Performance & Strikes (AgentStats) ──
-  const agentStats = [];
-  const perfSheet = ss.getSheetByName("AgentStats") || ss.getSheetByName("AgentPerformance");
-  if (perfSheet && perfSheet.getLastRow() > 1) {
-    const data = perfSheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      const r = data[i];
-      if (!r[1] && !r[0]) continue;
-      agentStats.push({
-        date: r[0],
-        agentName: r[1],
-        engagements: r[2] || "",
-        realLeads: r[3] || "",
-        payments: r[4] || "",
-        strikes: r[5] || 0,
-        time: r[6] || "",
-        leaderName: r[7] || "",
-        issueType: r[8] || (r[5] ? `${r[5]} Strike(s)` : "Performance Note"),
-        notes: r[9] || r[3] || ""
-      });
-    }
-  }
-
-  // ── 5. Team Leaders List from Users sheet ──
-  const teamLeadersList = [];
-  const usersSheet = ss.getSheetByName("Users");
-  if (usersSheet && usersSheet.getLastRow() > 1) {
-    const data = usersSheet.getDataRange().getValues();
-    const headers = data[0];
-    const idx = (name) => { const i = headers.indexOf(name); return i >= 0 ? i : null; };
-    const iEmail = idx("Email") ?? 0;
-    const iFirstName = idx("First Name") ?? 1;
-    const iLastName = idx("Last Name") ?? 2;
-    const iRole = idx("Account Type") ?? 5;
-
-    for (let i = 1; i < data.length; i++) {
-      const r = data[i];
-      if (String(r[iRole]).trim().toLowerCase() === "team leader") {
-        teamLeadersList.push({
-          firstName: r[iFirstName],
-          lastName: r[iLastName],
-          email: r[iEmail],
-          fullName: `${r[iFirstName]} ${r[iLastName]}`.trim()
-        });
-      }
-    }
-  }
-
+  // 4. Build and cache full payload
   const outputPayload = {
     status: "success",
-    agents: agents.reverse(),
-    leaders: leaders.reverse(),
-    objectives: objectives.reverse(),
-    agentStats: agentStats.reverse(),
-    teamLeadersList: teamLeadersList
+    agents,
+    leaders,
+    objectives,
+    agentStats,
+    teamLeadersList
   };
-
   const jsonStr = JSON.stringify(outputPayload);
-  if (jsonStr.length < 95000) {
-    try { cache.put("super_admin_portal_data", jsonStr, 180); } catch (e) { }
-  }
+  safeCachePut(CACHE_KEY_PORTAL, jsonStr, CACHE_TTL_PORTAL);
+
   return ContentService.createTextOutput(jsonStr).setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Lightweight endpoint — returns only today's agents & leaders.
+ * Served from a short-TTL cache so the map can refresh without
+ * pulling the entire portal payload.
+ */
+function getTodayAgentsHandler(ss) {
+  const cache = CacheService.getScriptCache();
+  const cachedToday = cache.get(CACHE_KEY_TODAY);
+  if (cachedToday) {
+    return ContentService.createTextOutput(cachedToday).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const todayStr = todayKey();
+  const agents  = buildAgentRows(ss).filter(a  => String(a.date  || "").startsWith(todayStr));
+  const leaders = buildLeaderRows(ss).filter(l  => String(l.date  || "").startsWith(todayStr));
+
+  const payload = JSON.stringify({
+    status: "success",
+    todayDate: todayStr,
+    agents:  agents.reverse(),
+    leaders: leaders.reverse()
+  });
+  safeCachePut(CACHE_KEY_TODAY, payload, CACHE_TTL_TODAY);
+  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
+}
+
 function getObjectivesDataHandler(ss) {
-  const result = getSuperAdminData(ss);
-  return result;
+  return getSuperAdminData(ss);
 }
 
