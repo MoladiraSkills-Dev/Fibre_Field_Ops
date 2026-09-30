@@ -210,24 +210,42 @@ function setupLoginTable() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 5. REVERSE GEOCODING (LocationIQ)
+// 5. REVERSE GEOCODING (LocationIQ) — server-side only, key never sent to client
 // ════════════════════════════════════════════════════════════════════════════
 function getReadableLocation(lat, lon) {
   try {
     const url = `https://us1.locationiq.com/v1/reverse?key=${LOCATIONIQ_API_KEY}&lat=${lat}&lon=${lon}&format=json`;
     const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
 
-    if (response.getResponseCode() === 200) {
-      const data = JSON.parse(response.getContentText());
-      if (data && data.display_name) {
-        return data.display_name;
-      }
-      return "ERROR: Missing display_name. Payload: " + response.getContentText();
+    if (response.getResponseCode() !== 200) {
+      return `API Error ${response.getResponseCode()}`;
     }
-    return `API Error ${response.getResponseCode()}: ${response.getContentText()}`;
+
+    const data = JSON.parse(response.getContentText());
+    if (!data) return "Location unavailable";
+
+    // Build a short, human-readable address (suburb + city), same as the
+    // old client-side code but now done securely on the server.
+    if (data.address) {
+      const addr = data.address;
+      const localArea = addr.suburb || addr.neighbourhood || addr.residential || addr.quarter || "";
+      const city = addr.city || addr.town || addr.village || addr.county || "";
+      const parts = [];
+      if (localArea) parts.push(localArea);
+      if (city && city !== localArea) parts.push(city);
+      if (parts.length > 0) return parts.join(", ");
+    }
+
+    // Fallback: first 3 comma-separated parts of the full display_name
+    if (data.display_name) {
+      return data.display_name.split(",").slice(0, 3).join(",").trim();
+    }
+
+    return "Location unavailable";
   } catch (err) {
-    return `FETCH ERROR: ${err.toString()}`;
+    return "Location lookup failed";
   }
+
 }
 
 // ════════════════════════════════════════════════════════════════════════════
