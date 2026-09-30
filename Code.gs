@@ -224,28 +224,31 @@ function getReadableLocation(lat, lon) {
     const data = JSON.parse(response.getContentText());
     if (!data) return "Location unavailable";
 
-    // Build a short, human-readable address (suburb + city), same as the
-    // old client-side code but now done securely on the server.
-    if (data.address) {
-      const addr = data.address;
-      const localArea = addr.suburb || addr.neighbourhood || addr.residential || addr.quarter || "";
-      const city = addr.city || addr.town || addr.village || addr.county || "";
-      const parts = [];
-      if (localArea) parts.push(localArea);
-      if (city && city !== localArea) parts.push(city);
-      if (parts.length > 0) return parts.join(", ");
+    // 1. Primary: Return the full, detailed address display string from LocationIQ
+    if (data.display_name) {
+      return String(data.display_name).trim();
     }
 
-    // Fallback: first 3 comma-separated parts of the full display_name
-    if (data.display_name) {
-      return data.display_name.split(",").slice(0, 3).join(",").trim();
+    // 2. Secondary fallback using structured address fields
+    if (data.address) {
+      const a = data.address;
+      const parts = [
+        (a.house_number ? a.house_number + " " : "") + (a.road || a.pedestrian || a.footway || a.street || ""),
+        a.suburb || a.neighbourhood || a.quarter || a.residential || a.village || "",
+        a.city || a.town || a.city_district || a.municipality || "",
+        a.state || a.province || "",
+        a.country || ""
+      ].filter(Boolean);
+
+      if (parts.length > 0) {
+        return parts.join(", ");
+      }
     }
 
     return "Location unavailable";
   } catch (err) {
     return "Location lookup failed";
   }
-
 }
 
 // ════════════════════════════════════════════════════════════════════════════

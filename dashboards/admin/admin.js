@@ -331,8 +331,31 @@ function updateMapMarkers(agents, leaders) {
         iconAnchor: [0, 0],
       });
 
+      const rawPhoto = item.photoUrl || "";
+      const thumb = driveThumb(rawPhoto);
+      let photoHtml = "";
+      if (thumb) {
+        const safeUrl = String(rawPhoto).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        const safeThumb = String(thumb).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        photoHtml = `
+          <div style="margin-top:8px;text-align:center;">
+            <img src="${safeThumb}" 
+                 alt="${item.name}" 
+                 loading="lazy" 
+                 style="max-height:110px;width:100%;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;display:block;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);" 
+                 onclick="openLightbox('${safeUrl}')"
+                 onerror="this.parentElement.innerHTML='<a href=&quot;${safeUrl}&quot; target=&quot;_blank&quot; style=&quot;font-size:11px;color:#0284c7;text-decoration:underline;&quot;>View Photo Proof ↗</a>'"/>
+          </div>`;
+      } else if (rawPhoto && String(rawPhoto).startsWith("http")) {
+        const safeUrl = String(rawPhoto).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        photoHtml = `
+          <div style="margin-top:6px;text-align:center;">
+            <a href="${safeUrl}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:underline;font-weight:600;">View Photo Proof ↗</a>
+          </div>`;
+      }
+
       const popupHtml = `
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:180px;padding:2px;">
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:190px;padding:2px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
             <b style="font-size:13px;color:#0f172a;">${item.name}</b>
             <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:${isLeader ? '#e0f2fe;color:#0369a1' : '#fef3c7;color:#92400e'}">
@@ -343,7 +366,7 @@ function updateMapMarkers(agents, leaders) {
           <div style="font-size:11px;color:#475569;margin-bottom:3px;">📍 ${item.location}</div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">🕒 ${formatSheetDate(item.date)} at ${formatSheetTime(item.time)}</div>
           ${count > 1 ? `<div style="font-size:10px;color:#0284c7;background:#f0f9ff;padding:3px 6px;border-radius:6px;margin-bottom:6px;font-weight:600;">👥 ${count} team members at this hub</div>` : ''}
-          ${item.photoUrl ? `<div style="margin-top:6px;text-align:center;"><img src="${item.photoUrl}" style="max-height:80px;border-radius:8px;border:1px solid #e2e8f0;display:inline-block;cursor:pointer;" onclick="openLightbox('${item.photoUrl}')"/></div>` : ''}
+          ${photoHtml}
         </div>
       `;
 
