@@ -122,6 +122,11 @@ async function getSuperAdminData() {
   return await getData("getSuperAdminData");
 }
 
+/** Lightweight fetch — today's agents + leaders only (uses its own short-TTL cache on the server). */
+async function getTodayAgents() {
+  return await getData("getTodayAgents");
+}
+
 async function getReadableLocation(lat, lon) {
   try {
     const apiKey = "pk.1be07ee2080691339d8fc4f1712dbc95";

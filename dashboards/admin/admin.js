@@ -3,6 +3,7 @@
 let mapInstance = null, markerLayer = null;
 let allAgentData = [], allLeaderData = [], allObjectives = [], allAgentStats = [];
 let agentFilter = "today", leaderFilter = "today";
+let mapFilter = "today"; // "today" | "all"
 
 // Check authentication on load
 window.addEventListener('DOMContentLoaded', () => {
@@ -154,7 +155,20 @@ function applyPortalData(agents, leaders, objectives, agentStats) {
   if (elLate) elLate.textContent = allAgentData.filter(a => a.isLate === "Yes").length;
   renderAgentTable(agentFilter);
   renderLeaderTable(leaderFilter);
-  if (mapInstance) updateMapMarkers(allAgentData, allLeaderData);
+
+  // Sync the map pin-count badge
+  const mapAgents  = mapFilter === "today" ? allAgentData.filter(a => isToday(a.date))  : allAgentData;
+  const mapLeaders = mapFilter === "today" ? allLeaderData.filter(l => isToday(l.date)) : allLeaderData;
+  const badge = document.getElementById("map-count-badge");
+  if (badge) {
+    const count = mapAgents.filter(a  => a.gps && a.gps !== "Auto-captured").length
+                + mapLeaders.filter(l => l.gps && l.gps !== "Auto-captured").length;
+    badge.textContent = `${count} pin${count !== 1 ? 's' : ''}`;
+  }
+
+  if (mapInstance) {
+    updateMapMarkers(mapAgents, mapLeaders);
+  }
   initMap();
 
   // Tab 2: Objectives & Team Leaders List
@@ -173,16 +187,48 @@ function initMap() {
       maxZoom: 19, attribution: "© OpenStreetMap",
     }).addTo(mapInstance);
     markerLayer = L.layerGroup().addTo(mapInstance);
-    updateMapMarkers(allAgentData, allLeaderData);
+    const mapAgents  = mapFilter === "today" ? allAgentData.filter(a => isToday(a.date))  : allAgentData;
+    const mapLeaders = mapFilter === "today" ? allLeaderData.filter(l => isToday(l.date)) : allLeaderData;
+    updateMapMarkers(mapAgents, mapLeaders);
   } else {
     mapInstance.invalidateSize();
     setTimeout(() => { 
       if (mapInstance) {
         mapInstance.invalidateSize(); 
-        updateMapMarkers(allAgentData, allLeaderData);
+        const mapAgents  = mapFilter === "today" ? allAgentData.filter(a => isToday(a.date))  : allAgentData;
+        const mapLeaders = mapFilter === "today" ? allLeaderData.filter(l => isToday(l.date)) : allLeaderData;
+        updateMapMarkers(mapAgents, mapLeaders);
       }
     }, 150);
   }
+}
+
+// ════ MAP FILTER TOGGLE ════
+/**
+ * Called by the Today/All toggle buttons above the map.
+ * Switches the map between showing only today's sign-ins vs all historical data.
+ */
+function setMapFilter(filter) {
+  mapFilter = filter;
+
+  // Update button styles
+  document.querySelectorAll("#map-filter-tabs .map-filter-btn").forEach(b => {
+    b.className = b.dataset.filter === filter
+      ? "map-filter-btn text-[11px] px-3 py-1 rounded-lg font-semibold bg-[#f59e0b] text-[#0f172a] transition"
+      : "map-filter-btn text-[11px] px-3 py-1 rounded-lg font-semibold bg-gray-100 text-gray-600 transition";
+  });
+
+  // Update marker count badge
+  const mapAgents  = filter === "today" ? allAgentData.filter(a => isToday(a.date))  : allAgentData;
+  const mapLeaders = filter === "today" ? allLeaderData.filter(l => isToday(l.date)) : allLeaderData;
+  const badge = document.getElementById("map-count-badge");
+  if (badge) {
+    const count = mapAgents.filter(a => a.gps && a.gps !== "Auto-captured").length
+                + mapLeaders.filter(l => l.gps && l.gps !== "Auto-captured").length;
+    badge.textContent = `${count} pin${count !== 1 ? 's' : ''}`;
+  }
+
+  updateMapMarkers(mapAgents, mapLeaders);
 }
 
 function updateMapMarkers(agents, leaders) {
